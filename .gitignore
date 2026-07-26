@@ -1,0 +1,42 @@
+# Dépendances
+node_modules/
+
+# Environnement (secrets — ne jamais committer)
+.env
+.env.*
+!.env.example
+
+# Backend (NestJS)
+backend/dist/
+backend/coverage/
+
+# Admin web (Next.js)
+admin-web/.next/
+admin-web/out/
+
+# Mobile (Expo)
+mobile/.expo/
+mobile/dist/
+mobile/web-build/
+mobile/expo-env.d.ts
+mobile/.kotlin/
+mobile/*.orig.*
+mobile/*.jks
+mobile/*.p8
+mobile/*.p12
+mobile/*.key
+mobile/*.mobileprovision
+mobile/ios/
+mobile/android/
+
+# Outils locaux
+.claude/
+
+# Logs & divers
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+*.log
+*.tsbuildinfo
+.DS_Store
+*.pem

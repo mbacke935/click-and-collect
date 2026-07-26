@@ -1,0 +1,35 @@
+import api from './api';
+import * as SecureStore from 'expo-secure-store';
+
+export interface LoginPayload {
+  email: string;
+  password: string;
+}
+
+export interface RegisterPayload extends LoginPayload {
+  nom?: string;
+  prenom?: string;
+  role?: 'client' | 'commercant';
+}
+
+export const authService = {
+  async login(payload: LoginPayload) {
+    const { data } = await api.post('/auth/login', payload);
+    await SecureStore.setItemAsync('accessToken', data.accessToken);
+    return data;
+  },
+
+  async register(payload: RegisterPayload) {
+    const { data } = await api.post('/auth/register', payload);
+    await SecureStore.setItemAsync('accessToken', data.accessToken);
+    return data;
+  },
+
+  async logout() {
+    await SecureStore.deleteItemAsync('accessToken');
+  },
+
+  async getToken() {
+    return SecureStore.getItemAsync('accessToken');
+  },
+};

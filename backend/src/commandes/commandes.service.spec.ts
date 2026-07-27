@@ -1,6 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { ConfigService } from '@nestjs/config';
 import { CommandesService } from './commandes.service';
 import { Commande, CommandeStatut } from './entities/commande.entity';
 import { BilletRetrait } from './entities/billet-retrait.entity';
@@ -18,6 +19,7 @@ describe('CommandesService', () => {
   let creneauxService: any;
   let boutiquesService: any;
   let realtimeGateway: any;
+  let configService: any;
 
   beforeEach(async () => {
     commandesRepo = {
@@ -30,6 +32,7 @@ describe('CommandesService', () => {
     creneauxService = { reserver: jest.fn(), liberer: jest.fn() };
     boutiquesService = { findOne: jest.fn() };
     realtimeGateway = { emitCommandeUpdate: jest.fn() };
+    configService = { get: jest.fn(() => 'qr-ticket-shared-secret-dev') };
 
     const module = await Test.createTestingModule({
       providers: [
@@ -40,6 +43,7 @@ describe('CommandesService', () => {
         { provide: CreneauxService, useValue: creneauxService },
         { provide: BoutiquesService, useValue: boutiquesService },
         { provide: RealtimeGateway, useValue: realtimeGateway },
+        { provide: ConfigService, useValue: configService },
       ],
     }).compile();
 

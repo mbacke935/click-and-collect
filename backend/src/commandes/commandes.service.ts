@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 import { Commande, CommandeStatut } from './entities/commande.entity';
 import { BilletRetrait } from './entities/billet-retrait.entity';
@@ -21,6 +22,7 @@ export class CommandesService {
     private readonly creneauxService: CreneauxService,
     private readonly boutiquesService: BoutiquesService,
     private readonly realtimeGateway: RealtimeGateway,
+    private readonly configService: ConfigService,
   ) {}
 
   async create(dto: CreateCommandeDto, clientId: string): Promise<Commande> {
@@ -50,7 +52,12 @@ export class CommandesService {
       commandeId: saved.id, boutique: panier.boutique_id, montant: montantTotal,
       articles: panier.lignes.map((l) => ({ produit: l.produit_id, qty: l.quantite, pu: l.prixUnitaire })),
     });
-    const key = crypto.scryptSync(process.env.JWT_SECRET || 'default_key', 'salt', 32);
+    // Clé dérivée du secret partagé QR_TICKET_SECRET (SHA-256 → 32 octets), et non de
+    // JWT_SECRET : ce secret est distinct et volontairement embarqué dans l'application
+    // Commerçant pour permettre une validation du billet entièrement hors-ligne
+    // (voir mobile/src/crypto/qrCipher.ts et dossier de spécifications §5.3.c).
+    const qrTicketSecret = this.configService.get<string>('qrTicketSecret');
+    const key = crypto.createHash('sha256').update(qrTicketSecret).digest();
     const iv = crypto.randomBytes(16);
     const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
     let encrypted = cipher.update(payload, 'utf8', 'hex');
@@ -75,6 +82,16 @@ export class CommandesService {
     return c;
   }
 
+  // À utiliser depuis les routes HTTP : vérifie que l'appelant est le client de la commande,
+  // le commerçant de la boutique concernée, ou un administrateur.
+  async findOneForUser(id: string, userId: string, userRole: string): Promise<Commande> {
+    const commande = await this.findOne(id);
+    if (userRole === UserRole.ADMINISTRATEUR || commande.client_id === userId) return commande;
+    const boutique = await this.boutiquesService.findOne(commande.boutique_id);
+    if (boutique.commercant_id === userId) return commande;
+    throw new ForbiddenException('Accès refusé.');
+  }
+
   findByClient(clientId: string): Promise<Commande[]> {
     return this.commandesRepository.find({
       where: { client_id: clientId },
@@ -89,6 +106,16 @@ export class CommandesService {
       relations: { billet: true, creneau: true },
       order: { dateCommande: 'DESC' },
     });
+  }
+
+  // À utiliser depuis les routes HTTP : seul le commerçant propriétaire ou un administrateur
+  // peut lister les commandes d'une boutique.
+  async findByBoutiqueForUser(boutiqueId: string, userId: string, userRole: string): Promise<Commande[]> {
+    if (userRole !== UserRole.ADMINISTRATEUR) {
+      const boutique = await this.boutiquesService.findOne(boutiqueId);
+      if (boutique.commercant_id !== userId) throw new ForbiddenException('Accès refusé.');
+    }
+    return this.findByBoutique(boutiqueId);
   }
 
   async updateStatut(id: string, dto: UpdateStatutDto, userId: string, userRole: string): Promise<Commande> {

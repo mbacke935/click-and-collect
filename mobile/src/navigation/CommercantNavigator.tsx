@@ -4,6 +4,8 @@ import { COLORS } from '../constants/theme';
 import DashboardScreen from '../screens/commercant/DashboardScreen';
 import CommandesScreen from '../screens/commercant/CommandesScreen';
 import ScanRetraitScreen from '../screens/commercant/ScanRetraitScreen';
+import CatalogueManagerScreen from '../screens/commercant/CatalogueManagerScreen';
+import CreneauxManagerScreen from '../screens/commercant/CreneauxManagerScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -20,6 +22,8 @@ export default function CommercantNavigator() {
       <Stack.Screen name="Dashboard" component={DashboardScreen} options={{ headerShown: false }} />
       <Stack.Screen name="CommandeDetail" component={CommandesScreen} options={{ title: 'Commande' }} />
       <Stack.Screen name="ScanRetrait" component={ScanRetraitScreen} options={{ title: 'Scanner' }} />
+      <Stack.Screen name="CatalogueManager" component={CatalogueManagerScreen} options={{ title: 'Catalogue' }} />
+      <Stack.Screen name="CreneauxManager" component={CreneauxManagerScreen} options={{ title: 'Créneaux' }} />
     </Stack.Navigator>
   );
 }

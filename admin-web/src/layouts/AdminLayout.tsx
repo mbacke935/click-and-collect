@@ -2,7 +2,7 @@
 
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import { isLoggedIn, logout } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 const NAV_ITEMS = [
   { href: '/', label: 'Tableau de bord' },
@@ -10,20 +10,26 @@ const NAV_ITEMS = [
   { href: '/boutiques', label: 'Boutiques' },
   { href: '/commandes', label: 'Commandes' },
   { href: '/sync', label: 'Synchronisation' },
+  { href: '/moderation', label: 'Modération' },
   { href: '/parametres', label: 'Paramètres' },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { loading, isAuthenticated, logout } = useAuth();
 
   useEffect(() => {
-    if (!isLoggedIn() && pathname !== '/login') {
+    if (!loading && !isAuthenticated && pathname !== '/login') {
       router.push('/login');
     }
-  }, [pathname]);
+  }, [loading, isAuthenticated, pathname]);
 
   if (pathname === '/login') return <>{children}</>;
+
+  // Tant que la session n'a pas été vérifiée (ou si elle est invalide), on n'affiche pas
+  // le contenu protégé — évite l'affichage furtif de données avant la redirection.
+  if (loading || !isAuthenticated) return null;
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#111' }}>

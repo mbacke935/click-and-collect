@@ -24,9 +24,10 @@ export default function DashboardPage() {
   return (
     <div>
       <h2 style={{ color: '#D4A843', fontSize: 20, fontWeight: 700, marginBottom: 20 }}>Tableau de bord</h2>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 28 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 14, marginBottom: 28 }}>
         <StatCard label="Commandes aujourd'hui" value={stats?.commandesAujourdhui ?? '—'} />
         <StatCard label="Chiffre d'affaires" value={stats ? `${stats.chiffreAffaires?.toLocaleString()} FCFA` : '—'} />
+        <StatCard label="Taux de retrait" value={stats ? `${stats.tauxRetrait}%` : '—'} />
         <StatCard label="Boutiques actives" value={stats?.totalBoutiques ?? '—'} />
         <StatCard label="Utilisateurs" value={stats?.totalUsers ?? '—'} />
       </div>

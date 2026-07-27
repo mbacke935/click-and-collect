@@ -26,4 +26,14 @@ export const FONTS = {
   monoGold: { fontSize: 14, fontFamily: 'monospace', color: COLORS.gold },
 };
 
-export const API_URL = 'http://192.168.1.23:3000'; // à adapter selon votre réseau
+export const API_URL = 'http://192.168.1.23:3001'; // à adapter selon votre réseau
+
+// Secret pré-partagé permettant à l'application Commerçant de déchiffrer et valider
+// un billet de retrait localement, sans appel réseau (dossier de spécifications §5.3.c :
+// "l'application Commerçant embarque la clé de déchiffrement nécessaire"). Doit être
+// identique à QR_TICKET_SECRET côté backend (backend/.env).
+// ⚠️ Simplification assumée pour ce projet académique : une seule clé statique par
+// déploiement, embarquée dans le bundle mobile. En production, on distribuerait plutôt
+// une clé par boutique/appareil via un provisioning sécurisé, plutôt qu'un secret unique
+// partagé par tous les commerçants.
+export const QR_TICKET_SECRET = 'qr-ticket-shared-secret-dev';

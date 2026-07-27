@@ -1,32 +1,17 @@
-import * as SQLite from 'expo-sqlite';
-
-let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
-
-function getDb() {
-  if (!dbPromise) {
-    dbPromise = SQLite.openDatabaseAsync('clickcollect_offline.db').then(async (db) => {
-      await db.execAsync(`
-        CREATE TABLE IF NOT EXISTS commandes_cache (
-          id TEXT PRIMARY KEY NOT NULL,
-          statut TEXT NOT NULL,
-          data TEXT NOT NULL,
-          dateCommande TEXT
-        );
-      `);
-      return db;
-    });
-  }
-  return dbPromise;
-}
+import { getDb } from '../storage/database';
+import { encryptForLocalCache, decryptFromLocalCache } from '../crypto/qrCipher';
 
 // Sauvegarde (ou met à jour) une commande complète — y compris son billet QR —
-// pour qu'elle reste consultable sans connexion réseau.
+// pour qu'elle reste consultable sans connexion réseau. La commande est chiffrée
+// (AES-256, clé locale à l'appareil) avant écriture : cf. dossier de spécifications
+// §5.3.b, la base SQLite elle-même n'étant pas chiffrée nativement sous Expo Go.
 export async function saveCommande(commande: any): Promise<void> {
   if (!commande?.id) return;
   const db = await getDb();
+  const encrypted = await encryptForLocalCache(commande);
   await db.runAsync(
     'INSERT OR REPLACE INTO commandes_cache (id, statut, data, dateCommande) VALUES (?, ?, ?, ?)',
-    commande.id, commande.statut, JSON.stringify(commande), commande.dateCommande || null,
+    commande.id, commande.statut, encrypted, commande.dateCommande || null,
   );
 }
 
@@ -39,5 +24,6 @@ export async function getCommandesHorsLigne(): Promise<any[]> {
   const rows = await db.getAllAsync<{ data: string }>(
     'SELECT data FROM commandes_cache ORDER BY dateCommande DESC',
   );
-  return rows.map((r) => JSON.parse(r.data));
+  const commandes = await Promise.all(rows.map((r) => decryptFromLocalCache(r.data)));
+  return commandes;
 }

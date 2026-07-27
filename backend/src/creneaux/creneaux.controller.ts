@@ -2,6 +2,9 @@ import { Body, Controller, Delete, Get, Param, Post, Query, Request, UseGuards }
 import { CreneauxService } from './creneaux.service';
 import { CreateCreneauDto } from './dto/create-creneau.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { UserRole } from '../users/entities/user.entity';
 
 // GET /boutiques/:boutiqueId/creneaux?jour=2026-07-22
 @Controller('boutiques/:boutiqueId/creneaux')
@@ -12,7 +15,8 @@ export class CreneauxController {
     return this.creneauxService.findByBoutique(boutiqueId, jour);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.COMMERCANT, UserRole.ADMINISTRATEUR)
   @Post() create(@Param('boutiqueId') boutiqueId: string, @Body() dto: CreateCreneauDto, @Request() req) {
     return this.creneauxService.create(boutiqueId, dto, req.user.userId);
   }

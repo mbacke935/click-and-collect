@@ -26,6 +26,11 @@ export class User {
   @Column({ type: 'enum', enum: UserRole, default: UserRole.CLIENT })
   role: UserRole;
 
+  // Permet à un administrateur de suspendre un compte (cf. cas d'utilisation
+  // Administrateur "Gérer les comptes"). Vérifié à la connexion (AuthService.login).
+  @Column({ default: true })
+  actif: boolean;
+
   @Column({ nullable: true })
   nom: string;
 

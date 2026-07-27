@@ -7,6 +7,7 @@ import api from '../../services/api';
 import StatusBadge from '../../components/StatusBadge';
 import { useAuth } from '../../context/AuthContext';
 import { connectSocket } from '../../services/socketService';
+import { flushSyncQueue } from '../../services/syncService';
 
 const FILTRES = ['recue', 'en_preparation', 'prete', 'recuperee'];
 const FILTRE_LABELS: Record<string, string> = {
@@ -21,6 +22,10 @@ export default function DashboardScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Tentative opportuniste de rattrapage : si des retraits ont été validés hors-ligne
+    // (voir ScanRetraitScreen), on essaie de les transmettre dès que ce tableau de bord
+    // est ouvert avec une connexion disponible.
+    flushSyncQueue();
     (async () => {
       try {
         const { data: bList } = await api.get('/boutiques/me/boutiques');
@@ -68,6 +73,20 @@ export default function DashboardScreen({ navigation }: any) {
           <Text style={styles.logout}>Déconnexion</Text>
         </TouchableOpacity>
       </View>
+      <View style={styles.manageRow}>
+        <TouchableOpacity
+          style={styles.manageChip}
+          onPress={() => navigation.navigate('CatalogueManager', { boutiqueId: boutiques[0]?.id })}
+        >
+          <Text style={styles.manageChipText}>Gérer le catalogue</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.manageChip}
+          onPress={() => navigation.navigate('CreneauxManager', { boutiqueId: boutiques[0]?.id })}
+        >
+          <Text style={styles.manageChipText}>Gérer les créneaux</Text>
+        </TouchableOpacity>
+      </View>
       <View style={styles.chips}>
         {FILTRES.map((f) => {
           const count = commandes.filter((c) => c.statut === f).length;
@@ -113,6 +132,9 @@ const styles = StyleSheet.create({
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   title: { fontSize: 20, fontWeight: '700', color: COLORS.gold },
   logout: { color: COLORS.muted, fontSize: 13, fontWeight: '600' },
+  manageRow: { flexDirection: 'row', gap: 8, marginBottom: 14 },
+  manageChip: { flex: 1, borderWidth: 1, borderColor: COLORS.goldDark, borderRadius: 6, paddingVertical: 10, alignItems: 'center' },
+  manageChipText: { color: COLORS.gold, fontSize: 12, fontWeight: '600' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 18 },
   chip: { borderWidth: 1, borderColor: COLORS.mutedLight, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7 },
   chipActive: { backgroundColor: COLORS.gold, borderColor: COLORS.gold },

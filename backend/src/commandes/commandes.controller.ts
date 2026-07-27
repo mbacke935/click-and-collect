@@ -20,13 +20,13 @@ export class CommandesController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.commandesService.findOne(id);
+  findOne(@Param('id') id: string, @Request() req) {
+    return this.commandesService.findOneForUser(id, req.user.userId, req.user.role);
   }
 
   @Get('boutique/:boutiqueId')
-  findByBoutique(@Param('boutiqueId') boutiqueId: string) {
-    return this.commandesService.findByBoutique(boutiqueId);
+  findByBoutique(@Param('boutiqueId') boutiqueId: string, @Request() req) {
+    return this.commandesService.findByBoutiqueForUser(boutiqueId, req.user.userId, req.user.role);
   }
 
   @Patch(':id/statut')

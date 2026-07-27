@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -8,8 +9,13 @@ import * as bcrypt from 'bcrypt';
 import { UsersService } from '../users/users.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { UserRole } from '../users/entities/user.entity';
 
 const SALT_ROUNDS = 10;
+
+// Rôles qu'un visiteur anonyme peut s'attribuer lui-même via /auth/register.
+// L'administrateur ne doit jamais pouvoir être créé par ce canal public.
+const SELF_REGISTRABLE_ROLES = [UserRole.CLIENT, UserRole.COMMERCANT];
 
 @Injectable()
 export class AuthService {
@@ -19,6 +25,12 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto) {
+    if (dto.role && !SELF_REGISTRABLE_ROLES.includes(dto.role)) {
+      throw new ForbiddenException(
+        'Ce rôle ne peut pas être choisi lors de l\'inscription.',
+      );
+    }
+
     const existing = await this.usersService.findByEmail(dto.email);
     if (existing) {
       throw new ConflictException('Un compte existe déjà avec cet email.');
@@ -45,6 +57,10 @@ export class AuthService {
     const passwordValid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!passwordValid) {
       throw new UnauthorizedException('Identifiants invalides.');
+    }
+
+    if (!user.actif) {
+      throw new ForbiddenException('Ce compte a été suspendu par un administrateur.');
     }
 
     return this.buildToken(user.id, user.email, user.role);

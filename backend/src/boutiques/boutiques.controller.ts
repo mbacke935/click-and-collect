@@ -3,6 +3,9 @@ import { BoutiquesService } from './boutiques.service';
 import { CreateBoutiqueDto } from './dto/create-boutique.dto';
 import { UpdateBoutiqueDto } from './dto/update-boutique.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { UserRole } from '../users/entities/user.entity';
 
 @Controller('boutiques')
 export class BoutiquesController {
@@ -16,7 +19,8 @@ export class BoutiquesController {
     return this.boutiquesService.findByCommercant(req.user.userId);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.COMMERCANT, UserRole.ADMINISTRATEUR)
   @Post() create(@Body() dto: CreateBoutiqueDto, @Request() req) {
     return this.boutiquesService.create(dto, req.user.userId);
   }

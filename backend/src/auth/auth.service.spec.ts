@@ -1,5 +1,5 @@
 import { Test } from '@nestjs/testing';
-import { ConflictException, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { AuthService } from './auth.service';
@@ -69,10 +69,20 @@ describe('AuthService', () => {
     it('retourne un token pour des identifiants valides', async () => {
       const passwordHash = await bcrypt.hash('bonmdp123', 10);
       usersService.findByEmail.mockResolvedValue({
-        id: 'u1', email: 'a@a.com', passwordHash, role: UserRole.CLIENT,
+        id: 'u1', email: 'a@a.com', passwordHash, role: UserRole.CLIENT, actif: true,
       });
       const result = await service.login({ email: 'a@a.com', password: 'bonmdp123' });
       expect(result).toEqual({ accessToken: 'signed-token' });
+    });
+
+    it('rejette la connexion d\'un compte suspendu par un administrateur', async () => {
+      const passwordHash = await bcrypt.hash('bonmdp123', 10);
+      usersService.findByEmail.mockResolvedValue({
+        id: 'u1', email: 'a@a.com', passwordHash, role: UserRole.CLIENT, actif: false,
+      });
+      await expect(
+        service.login({ email: 'a@a.com', password: 'bonmdp123' }),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 });

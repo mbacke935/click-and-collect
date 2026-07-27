@@ -15,26 +15,28 @@ export class SyncService {
     private readonly commandesService: CommandesService,
   ) {}
 
-  async processBatch(events: SyncEventDto[], userId: string): Promise<EvenementSync[]> {
+  async processBatch(events: SyncEventDto[], userId: string, userRole: string): Promise<EvenementSync[]> {
     const results: EvenementSync[] = [];
     for (const evt of events) {
-      // Idempotence : on saute si déjà traité
-      const existing = await this.syncRepository.findOne({
-        where: { commande_id: evt.commande_id, action: evt.action, horodatageLocal: new Date(evt.horodatageLocal) },
-      });
+      // Idempotence : on saute si cet identifiant d'événement (généré côté appareil) a déjà
+      // été traité — robuste au rejeu, contrairement à une clé composite basée sur l'horodatage.
+      const existing = await this.syncRepository.findOne({ where: { clientEventId: evt.eventId } });
       if (existing) { this.logger.log(`Événement déjà traité : ${existing.id}`); results.push(existing); continue; }
 
       const record = this.syncRepository.create({
+        clientEventId: evt.eventId,
         action: evt.action, commande_id: evt.commande_id, billet_id: evt.billet_id,
         payload: evt.payload, horodatageLocal: new Date(evt.horodatageLocal),
         user_id: userId, statut: SyncStatut.PENDING,
       });
 
       try {
+        // Le rôle vient du JWT vérifié côté serveur, jamais du payload fourni par le client
+        // (un payload.userRole falsifié permettrait sinon de contourner le contrôle de propriété).
         if (evt.action === SyncAction.RETRAIT_VALIDE) {
-          await this.commandesService.updateStatut(evt.commande_id, { statut: CommandeStatut.RECUPEREE }, userId, evt.payload.userRole || 'commercant');
+          await this.commandesService.updateStatut(evt.commande_id, { statut: CommandeStatut.RECUPEREE }, userId, userRole);
         } else if (evt.action === SyncAction.STATUT_CHANGE && evt.payload.statut) {
-          await this.commandesService.updateStatut(evt.commande_id, { statut: evt.payload.statut }, userId, evt.payload.userRole || 'commercant');
+          await this.commandesService.updateStatut(evt.commande_id, { statut: evt.payload.statut }, userId, userRole);
         }
         record.statut = SyncStatut.SYNCED;
       } catch (error) {

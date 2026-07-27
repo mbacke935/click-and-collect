@@ -3,6 +3,7 @@ import { Type } from 'class-transformer';
 import { SyncAction } from '../entities/evenement-sync.entity';
 
 export class SyncEventDto {
+  @IsString() @IsNotEmpty() eventId: string;
   @IsEnum(SyncAction) action: SyncAction;
   @IsString() @IsNotEmpty() commande_id: string;
   @IsString() @IsOptional() billet_id?: string;

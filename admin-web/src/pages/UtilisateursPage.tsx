@@ -9,11 +9,19 @@ const ROLE_COLORS: Record<string, string> = { client: '#D4A843', commercant: '#4
 export default function UtilisateursPage() {
   const [users, setUsers] = useState<any[]>([]);
   const [filtre, setFiltre] = useState('');
+  const [erreur, setErreur] = useState('');
 
-  useEffect(() => {
+  const charger = () => {
     const path = filtre ? `/admin/users?role=${filtre}` : '/admin/users';
-    apiFetch(path).then(setUsers).catch(() => {});
-  }, [filtre]);
+    apiFetch(path).then(setUsers).catch(() => setErreur('Impossible de charger les utilisateurs.'));
+  };
+
+  useEffect(charger, [filtre]);
+
+  const toggle = async (id: string, actif: boolean) => {
+    await apiFetch(`/admin/users/${id}/toggle?active=${actif}`, { method: 'PATCH' });
+    charger();
+  };
 
   return (
     <div>
@@ -30,6 +38,7 @@ export default function UtilisateursPage() {
           </button>
         ))}
       </div>
+      {erreur && <p style={{ color: '#EF4444', fontSize: 13, marginBottom: 16 }}>{erreur}</p>}
       <DataTable
         columns={[
           { key: 'prenom', label: 'Prénom' },
@@ -37,6 +46,16 @@ export default function UtilisateursPage() {
           { key: 'email', label: 'Email' },
           { key: 'role', label: 'Rôle', render: (v) => (
             <span style={{ color: ROLE_COLORS[v] || '#999', fontWeight: 600, fontSize: 12, textTransform: 'uppercase' }}>{v}</span>
+          )},
+          { key: 'actif', label: 'Statut', render: (v, row) => (
+            <button onClick={() => toggle(row.id, !v)} style={{
+              padding: '4px 12px', borderRadius: 3, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+              border: 'none', textTransform: 'uppercase',
+              backgroundColor: v ? 'rgba(74,222,128,0.15)' : 'rgba(239,68,68,0.15)',
+              color: v ? '#4ADE80' : '#EF4444',
+            }}>
+              {v ? 'Actif' : 'Suspendu'}
+            </button>
           )},
           { key: 'dateCreation', label: 'Inscription', render: (v) => new Date(v).toLocaleDateString('fr-FR') },
         ]}

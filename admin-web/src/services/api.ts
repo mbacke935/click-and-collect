@@ -1,6 +1,6 @@
 'use client';
 
-const API_URL = 'http://localhost:3000';
+const API_URL = 'http://localhost:3001';
 
 function getToken(): string | null {
   if (typeof window === 'undefined') return null;
@@ -38,6 +38,43 @@ export function logout() {
   window.location.href = '/login';
 }
 
+interface JwtPayload {
+  sub: string;
+  email: string;
+  role: string;
+  exp: number;
+}
+
+function decodeToken(token: string): JwtPayload | null {
+  try {
+    const payloadB64Url = token.split('.')[1];
+    const payloadB64 = payloadB64Url.replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(atob(payloadB64));
+  } catch {
+    return null;
+  }
+}
+
+export interface AdminSession {
+  email: string;
+  role: string;
+}
+
+// Vérifie le jeton en profondeur (bien formé, non expiré, rôle administrateur) plutôt que
+// sa simple présence — un jeton expiré ou appartenant à un compte non-admin ne doit pas
+// laisser passer la garde d'authentification du back-office.
+export function getValidSession(): AdminSession | null {
+  const token = getToken();
+  if (!token) return null;
+  const payload = decodeToken(token);
+  const nowSeconds = Date.now() / 1000;
+  if (!payload || payload.exp < nowSeconds || payload.role !== 'administrateur') {
+    localStorage.removeItem('adminToken');
+    return null;
+  }
+  return { email: payload.email, role: payload.role };
+}
+
 export function isLoggedIn(): boolean {
-  return !!getToken();
+  return !!getValidSession();
 }

@@ -18,6 +18,8 @@ interface Props<T> {
   erreur?: string;
   onReessayer?: () => void;
   emptyMessage?: string;
+  /** Met en évidence la ligne concernée par l'action en cours (ex. celle en édition). */
+  ligneActive?: (row: T) => boolean;
 }
 
 const cellulePleineLargeur: React.CSSProperties = {
@@ -29,7 +31,7 @@ const cellulePleineLargeur: React.CSSProperties = {
 
 export default function DataTable<T extends Record<string, any>>({
   columns, data, rowKey, loading = false, erreur = '', onReessayer,
-  emptyMessage = 'Aucune donnée.',
+  emptyMessage = 'Aucune donnée.', ligneActive,
 }: Props<T>) {
   const cleLigne = rowKey ?? ((row: T, index: number) => String(row.id ?? index));
 
@@ -73,15 +75,26 @@ export default function DataTable<T extends Record<string, any>>({
         </tr>
       );
     }
-    return data.map((row, i) => (
-      <tr key={cleLigne(row, i)} style={{ borderBottom: `1px solid ${COLORS.line}` }}>
-        {columns.map((col) => (
-          <td key={col.key} style={{ padding: '11px 12px', color: COLORS.white }}>
-            {col.render ? col.render(row[col.key], row) : (row[col.key] as ReactNode)}
-          </td>
-        ))}
-      </tr>
-    ));
+    return data.map((row, i) => {
+      const active = ligneActive?.(row) ?? false;
+      return (
+        <tr
+          key={cleLigne(row, i)}
+          aria-selected={active || undefined}
+          style={{
+            borderBottom: `1px solid ${COLORS.line}`,
+            backgroundColor: active ? 'rgba(212,168,67,0.10)' : undefined,
+            boxShadow: active ? `inset 3px 0 0 ${COLORS.gold}` : undefined,
+          }}
+        >
+          {columns.map((col) => (
+            <td key={col.key} style={{ padding: '11px 12px', color: COLORS.white }}>
+              {col.render ? col.render(row[col.key], row) : (row[col.key] as ReactNode)}
+            </td>
+          ))}
+        </tr>
+      );
+    });
   };
 
   return (

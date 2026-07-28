@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { adminApi } from '../services/api';
 import { useApiData } from '../hooks/useApiData';
 import { useAuth } from '../context/AuthContext';
@@ -33,6 +33,15 @@ export default function UtilisateursPage() {
   const [saving, setSaving] = useState(false);
   const [formErreur, setFormErreur] = useState('');
   const [actionErreur, setActionErreur] = useState('');
+  const formulaireRef = useRef<HTMLDivElement>(null);
+
+  // Le formulaire est rendu sous le tableau : avec plusieurs dizaines de comptes il se
+  // retrouve hors écran, et un clic sur « Modifier » n'avait aucun effet visible même s'il
+  // remplissait bien les champs. On amène donc le formulaire dans le champ de vision.
+  useEffect(() => {
+    if (!editingId) return;
+    formulaireRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [editingId]);
 
   const users = useMemo(() => data ?? [], [data]);
 
@@ -139,6 +148,7 @@ export default function UtilisateursPage() {
         onReessayer={recharger}
         emptyMessage={recherche ? 'Aucun utilisateur ne correspond à cette recherche.' : 'Aucun utilisateur.'}
         data={usersAffiches}
+        ligneActive={(row) => row.id === editingId}
         columns={[
           { key: 'prenom', label: 'Prénom', render: (v) => v || '—' },
           { key: 'nom', label: 'Nom', render: (v) => v || '—' },
@@ -163,7 +173,14 @@ export default function UtilisateursPage() {
             key: 'id', label: 'Actions',
             render: (id, row) => (
               <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={() => startEdit(row)} style={STYLES.buttonSmall}>Modifier</button>
+                <button
+                  onClick={() => startEdit(row)}
+                  style={editingId === row.id
+                    ? { ...STYLES.buttonSmall, borderColor: COLORS.gold, color: COLORS.gold }
+                    : STYLES.buttonSmall}
+                >
+                  {editingId === row.id ? 'En cours…' : 'Modifier'}
+                </button>
                 {id !== session?.id && (
                   <button
                     onClick={() => supprimer(row)}
@@ -178,9 +195,17 @@ export default function UtilisateursPage() {
         ]}
       />
 
-      <div style={{ ...STYLES.card, marginTop: 24, maxWidth: 480 }}>
+      <div
+        ref={formulaireRef}
+        style={{
+          ...STYLES.card, marginTop: 24, maxWidth: 480,
+          // Bordure dorée en mode édition : le formulaire sert aux deux usages
+          // (création et modification), la distinction doit se voir d'un coup d'œil.
+          borderColor: editingId ? COLORS.gold : COLORS.line,
+        }}
+      >
         <h3 style={{ color: COLORS.white, fontSize: 15, fontWeight: 600, marginTop: 0, marginBottom: 16 }}>
-          {editingId ? 'Modifier le compte' : 'Nouveau compte'}
+          {editingId ? `Modifier le compte — ${form.prenom || ''} ${form.nom || ''}`.trim() : 'Nouveau compte'}
         </h3>
 
         <label style={STYLES.label} htmlFor="u-email">Email</label>

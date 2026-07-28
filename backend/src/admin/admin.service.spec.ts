@@ -23,10 +23,12 @@ describe('AdminService', () => {
     usersRepo = {
       findOne: jest.fn(), save: jest.fn((x) => Promise.resolve({ id: 'new-id', ...x })),
       count: jest.fn(), create: jest.fn((x) => x), remove: jest.fn(),
+      find: jest.fn().mockResolvedValue([]),
     };
-    boutiquesRepo = { count: jest.fn() };
+    boutiquesRepo = { count: jest.fn(), findBy: jest.fn().mockResolvedValue([]) };
     commandesRepo = {
       count: jest.fn(),
+      find: jest.fn().mockResolvedValue([]),
       createQueryBuilder: jest.fn(() => ({
         where: jest.fn().mockReturnThis(),
         select: jest.fn().mockReturnThis(),
@@ -140,6 +142,59 @@ describe('AdminService', () => {
       usersRepo.findOne.mockResolvedValue({ id: 'client1', role: UserRole.CLIENT });
       await service.deleteUser('client1', 'admin1');
       expect(usersRepo.remove).toHaveBeenCalledWith({ id: 'client1', role: UserRole.CLIENT });
+    });
+  });
+
+  describe('findAllCommandes', () => {
+    const COMMANDES = [
+      { id: 'c1', boutique_id: 'b1', client_id: 'u1', montantTotal: 500 },
+      { id: 'c2', boutique_id: 'b-supprimee', client_id: 'u-supprime', montantTotal: 800 },
+    ];
+
+    it('rapporte le nom de la boutique et l\'identité du client sur chaque commande', async () => {
+      commandesRepo.find.mockResolvedValue(COMMANDES);
+      boutiquesRepo.findBy.mockResolvedValue([{ id: 'b1', nom: 'Boulangerie Chez Awa' }]);
+      usersRepo.find.mockResolvedValue([
+        { id: 'u1', email: 'fatou@mail.sn', nom: 'Diallo', prenom: 'Fatou' },
+      ]);
+
+      const [premiere] = await service.findAllCommandes();
+
+      expect(premiere.boutiqueNom).toBe('Boulangerie Chez Awa');
+      expect(premiere.clientEmail).toBe('fatou@mail.sn');
+      expect(premiere.clientNom).toBe('Fatou Diallo');
+    });
+
+    it('laisse les libellés à null quand la boutique ou le client a été supprimé', async () => {
+      commandesRepo.find.mockResolvedValue(COMMANDES);
+      boutiquesRepo.findBy.mockResolvedValue([{ id: 'b1', nom: 'Boulangerie Chez Awa' }]);
+      usersRepo.find.mockResolvedValue([{ id: 'u1', email: 'fatou@mail.sn', nom: 'Diallo', prenom: 'Fatou' }]);
+
+      const [, seconde] = await service.findAllCommandes();
+
+      expect(seconde.boutiqueNom).toBeNull();
+      expect(seconde.clientEmail).toBeNull();
+      expect(seconde.clientNom).toBeNull();
+    });
+
+    it('ne demande à la base que les champs affichables du client, jamais son passwordHash', async () => {
+      commandesRepo.find.mockResolvedValue(COMMANDES);
+
+      await service.findAllCommandes();
+
+      const options = usersRepo.find.mock.calls[0][0];
+      expect(options.select).toEqual({ id: true, email: true, nom: true, prenom: true });
+      expect(options.select).not.toHaveProperty('passwordHash');
+    });
+
+    it('ne lance aucune requête supplémentaire quand il n\'y a aucune commande', async () => {
+      commandesRepo.find.mockResolvedValue([]);
+
+      const resultat = await service.findAllCommandes();
+
+      expect(resultat).toEqual([]);
+      expect(usersRepo.find).not.toHaveBeenCalled();
+      expect(boutiquesRepo.findBy).not.toHaveBeenCalled();
     });
   });
 

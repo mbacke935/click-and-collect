@@ -116,7 +116,22 @@ export default function SyncMonitoringPage() {
             key: 'commande_id', label: 'Commande',
             render: (v) => <span style={STYLES.mono}>{String(v).substring(0, 8)}</span>,
           },
-          { key: 'statut', label: 'Statut', triable: true, render: (v) => <SyncStatusBadge statut={String(v)} /> },
+          {
+            key: 'statut', label: 'Statut', triable: true,
+            render: (v, row) => (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                <SyncStatusBadge statut={String(v)} />
+                {/* Le motif de l'échec est journalisé par le serveur dans le payload.
+                    Sans lui, la page signalait un incident sans permettre de le diagnostiquer,
+                    alors que le suivi des incidents est l'objet même de cet écran. */}
+                {row.statut === 'failed' && typeof row.payload?.error === 'string' && (
+                  <span style={{ color: COLORS.red, fontSize: 11, maxWidth: 260 }}>
+                    {row.payload.error}
+                  </span>
+                )}
+              </div>
+            ),
+          },
           {
             key: 'horodatageLocal', label: 'Validé hors-ligne', triable: true,
             render: (v) => new Date(String(v)).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }),

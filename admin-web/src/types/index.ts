@@ -48,6 +48,11 @@ export interface Commande {
   client_id: string;
   boutique_id: string;
   dateCommande: string;
+  // Libellés résolus côté serveur à partir des identifiants ci-dessus. Nuls si la
+  // boutique ou le compte client a été supprimé depuis la commande.
+  boutiqueNom: string | null;
+  clientEmail: string | null;
+  clientNom: string | null;
 }
 
 export type StatutSync = 'synced' | 'pending' | 'failed';

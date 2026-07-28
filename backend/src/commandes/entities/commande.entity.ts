@@ -25,6 +25,11 @@ export class Commande {
   @Column({ type: 'enum', enum: CommandeStatut, default: CommandeStatut.RECUE }) statut: CommandeStatut;
   @Column({ type: 'int' }) montantTotal: number;
   @Column({ type: 'enum', enum: ModePaiement, default: ModePaiement.SUR_PLACE }) modePaiement: ModePaiement;
+  // client_id et boutique_id sont de simples colonnes, sans relation TypeORM déclarée :
+  // elles ont été créées en varchar alors que users.id et boutiques.id sont en uuid.
+  // Déclarer une relation ici forcerait une conversion de type de la colonne existante,
+  // que TypeORM ne sait pas mener sur des données en place. Le nom de la boutique et
+  // l'identité du client sont donc rapportés par AdminService.findAllCommandes.
   @Column() client_id: string;
   @Column() boutique_id: string;
   @ManyToOne(() => Panier, { onDelete: 'SET NULL', nullable: true })

@@ -1,6 +1,6 @@
 import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { User, UserRole } from '../users/entities/user.entity';
 import { Boutique } from '../boutiques/entities/boutique.entity';
@@ -12,6 +12,14 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
 const SALT_ROUNDS = 10;
+
+// Commande augmentée des libellés lisibles par un administrateur, résolus depuis les
+// identifiants bruts stockés sur la commande.
+export type CommandeEnrichie = Commande & {
+  boutiqueNom: string | null;
+  clientEmail: string | null;
+  clientNom: string | null;
+};
 
 @Injectable()
 export class AdminService {
@@ -125,13 +133,39 @@ export class AdminService {
     return this.boutiquesRepository.save(boutique);
   }
 
-  findAllCommandes(statut?: string): Promise<Commande[]> {
+  // Rapporte le nom de la boutique et l'identité du client : la supervision n'affichait
+  // jusqu'ici que des identifiants tronqués, inexploitables pour un administrateur.
+  //
+  // L'association se fait en mémoire plutôt que par une relation TypeORM : commandes.client_id
+  // est en varchar tandis que users.id est en uuid (voir Commande), ce qui empêche une
+  // jointure directe. Deux requêtes groupées suffisent — pas de N+1 — et le client est
+  // réduit aux champs affichables, sans jamais exposer son passwordHash.
+  async findAllCommandes(statut?: string): Promise<CommandeEnrichie[]> {
     const where: any = {};
     if (statut) where.statut = statut;
-    return this.commandesRepository.find({
+    const commandes = await this.commandesRepository.find({
       where, relations: { billet: true, creneau: true },
       order: { dateCommande: 'DESC' }, take: 200,
     });
+    if (commandes.length === 0) return [];
+
+    const [boutiques, clients] = await Promise.all([
+      this.boutiquesRepository.findBy({ id: In([...new Set(commandes.map((c) => c.boutique_id))]) }),
+      this.usersRepository.find({
+        where: { id: In([...new Set(commandes.map((c) => c.client_id))]) },
+        select: { id: true, email: true, nom: true, prenom: true },
+      }),
+    ]);
+    const parBoutique = new Map(boutiques.map((b) => [b.id, b]));
+    const parClient = new Map(clients.map((u) => [u.id, u]));
+
+    return commandes.map((commande) => ({
+      ...commande,
+      boutiqueNom: parBoutique.get(commande.boutique_id)?.nom ?? null,
+      clientEmail: parClient.get(commande.client_id)?.email ?? null,
+      clientNom: [parClient.get(commande.client_id)?.prenom, parClient.get(commande.client_id)?.nom]
+        .filter(Boolean).join(' ') || null,
+    }));
   }
 
   // Modération des catalogues : vue transverse de tous les produits, toutes boutiques

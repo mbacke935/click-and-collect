@@ -109,19 +109,20 @@ export default function SyncMonitoringPage() {
         onReessayer={rechargerEvents}
         emptyMessage={filtre ? 'Aucun événement avec ce statut.' : 'Aucun événement de synchronisation.'}
         data={eventsAffiches}
+        taillePage={25}
         columns={[
-          { key: 'action', label: 'Action' },
+          { key: 'action', label: 'Action', triable: true },
           {
             key: 'commande_id', label: 'Commande',
             render: (v) => <span style={STYLES.mono}>{String(v).substring(0, 8)}</span>,
           },
-          { key: 'statut', label: 'Statut', render: (v) => <SyncStatusBadge statut={String(v)} /> },
+          { key: 'statut', label: 'Statut', triable: true, render: (v) => <SyncStatusBadge statut={String(v)} /> },
           {
-            key: 'horodatageLocal', label: 'Validé hors-ligne',
+            key: 'horodatageLocal', label: 'Validé hors-ligne', triable: true,
             render: (v) => new Date(String(v)).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }),
           },
           {
-            key: 'dateReception', label: 'Reçu serveur',
+            key: 'dateReception', label: 'Reçu serveur', triable: true,
             render: (v) => new Date(String(v)).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }),
           },
           {

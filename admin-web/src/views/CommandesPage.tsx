@@ -53,16 +53,17 @@ export default function CommandesPage() {
         onReessayer={recharger}
         emptyMessage={filtre ? `Aucune commande « ${STATUT_COMMANDE_LABELS[filtre]} ».` : 'Aucune commande.'}
         data={commandes}
+        taillePage={25}
         columns={[
           { key: 'id', label: 'ID', render: (v) => <span style={STYLES.mono}>{String(v).substring(0, 8)}</span> },
           {
-            key: 'montantTotal', label: 'Montant',
+            key: 'montantTotal', label: 'Montant', triable: true,
             render: (v) => <span style={STYLES.mono}>{Number(v).toLocaleString('fr-FR')} FCFA</span>,
           },
-          { key: 'statut', label: 'Statut', render: (v) => <StatutCommandeBadge statut={String(v)} /> },
-          { key: 'modePaiement', label: 'Paiement', render: (v) => (v === 'en_ligne' ? 'En ligne' : 'Sur place') },
+          { key: 'statut', label: 'Statut', triable: true, render: (v) => <StatutCommandeBadge statut={String(v)} /> },
+          { key: 'modePaiement', label: 'Paiement', triable: true, render: (v) => (v === 'en_ligne' ? 'En ligne' : 'Sur place') },
           {
-            key: 'dateCommande', label: 'Date',
+            key: 'dateCommande', label: 'Date', triable: true,
             render: (v) => new Date(String(v)).toLocaleString('fr-FR', {
               dateStyle: 'short', timeStyle: 'short',
             }),

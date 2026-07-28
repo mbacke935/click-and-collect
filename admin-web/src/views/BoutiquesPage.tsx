@@ -60,12 +60,13 @@ export default function BoutiquesPage() {
         onReessayer={recharger}
         emptyMessage={recherche ? 'Aucune boutique ne correspond à cette recherche.' : 'Aucune boutique.'}
         data={boutiquesAffichees}
+        taillePage={25}
         columns={[
-          { key: 'nom', label: 'Nom' },
-          { key: 'categorie', label: 'Catégorie', render: (v) => <span style={pastilleStyle(COLORS.gold)}>{String(v)}</span> },
-          { key: 'adresse', label: 'Adresse' },
+          { key: 'nom', label: 'Nom', triable: true },
+          { key: 'categorie', label: 'Catégorie', triable: true, render: (v) => <span style={pastilleStyle(COLORS.gold)}>{String(v)}</span> },
+          { key: 'adresse', label: 'Adresse', triable: true },
           {
-            key: 'active', label: 'Statut',
+            key: 'active', label: 'Statut', triable: true,
             render: (_v, row) => (
               <ToggleBadge
                 actif={row.active}
@@ -75,7 +76,7 @@ export default function BoutiquesPage() {
               />
             ),
           },
-          { key: 'dateCreation', label: 'Création', render: (v) => new Date(String(v)).toLocaleDateString('fr-FR') },
+          { key: 'dateCreation', label: 'Création', triable: true, render: (v) => new Date(String(v)).toLocaleDateString('fr-FR') },
         ]}
       />
     </div>

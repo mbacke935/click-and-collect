@@ -79,19 +79,20 @@ export default function ModerationPage() {
         onReessayer={recharger}
         emptyMessage={recherche || masquerRetires ? 'Aucun produit ne correspond à ces critères.' : 'Aucun produit à modérer.'}
         data={produitsAffiches}
+        taillePage={25}
         columns={[
-          { key: 'nom', label: 'Produit' },
+          { key: 'nom', label: 'Produit', triable: true },
           { key: 'boutique', label: 'Boutique', render: (_v, row) => row.boutique?.nom ?? '—' },
           {
-            key: 'categorie', label: 'Catégorie',
+            key: 'categorie', label: 'Catégorie', triable: true,
             render: (v) => (v ? <span style={pastilleStyle(COLORS.gold)}>{String(v)}</span> : '—'),
           },
           {
-            key: 'prix', label: 'Prix',
+            key: 'prix', label: 'Prix', triable: true,
             render: (v) => <span style={STYLES.mono}>{Number(v).toLocaleString('fr-FR')} FCFA</span>,
           },
           {
-            key: 'actif', label: 'Statut',
+            key: 'actif', label: 'Statut', triable: true,
             render: (_v, row) => (
               <ToggleBadge
                 actif={row.actif}

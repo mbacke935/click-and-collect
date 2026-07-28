@@ -47,12 +47,19 @@ export const ROLE_COLORS: Record<string, string> = {
 // Fragments de style réutilisés d'une page à l'autre. Le projet utilise des styles inline
 // (pas de CSS global ni de classes utilitaires) : les centraliser ici évite la dérive de
 // valeurs codées en dur répétées dans chaque fichier.
+//
+// Les bordures sont déclarées en propriétés séparées (borderWidth/Style/Color) plutôt
+// qu'avec le raccourci `border` : les appelants surchargent couramment la seule couleur,
+// et mélanger raccourci et propriété détaillée sur un même élément produit un rendu
+// imprévisible entre deux rendus React (l'une n'annule pas proprement l'autre).
 export const STYLES = {
   card: {
     backgroundColor: COLORS.blackCard,
     borderRadius: 6,
     padding: 20,
-    border: `1px solid ${COLORS.line}`,
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: COLORS.line,
   } as CSSProperties,
 
   input: {
@@ -61,7 +68,9 @@ export const STYLES = {
     fontSize: 13,
     color: COLORS.white,
     background: COLORS.blackSoft,
-    border: `1px solid #444`,
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: '#444',
     borderRadius: 4,
     outline: 'none',
   } as CSSProperties,
@@ -81,7 +90,9 @@ export const STYLES = {
     fontWeight: 700,
     backgroundColor: COLORS.gold,
     color: COLORS.black,
-    border: 'none',
+    borderWidth: 0,
+    borderStyle: 'solid',
+    borderColor: 'transparent',
     borderRadius: 6,
     cursor: 'pointer',
   } as CSSProperties,
@@ -92,7 +103,9 @@ export const STYLES = {
     fontWeight: 700,
     background: 'transparent',
     color: COLORS.muted,
-    border: `1px solid ${COLORS.mutedLight}`,
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: COLORS.mutedLight,
     borderRadius: 6,
     cursor: 'pointer',
   } as CSSProperties,
@@ -101,7 +114,9 @@ export const STYLES = {
     padding: '4px 10px',
     fontSize: 11,
     background: 'transparent',
-    border: `1px solid ${COLORS.mutedLight}`,
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: COLORS.mutedLight,
     color: COLORS.muted,
     borderRadius: 3,
     cursor: 'pointer',

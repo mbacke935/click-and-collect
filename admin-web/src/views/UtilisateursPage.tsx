@@ -149,16 +149,17 @@ export default function UtilisateursPage() {
         emptyMessage={recherche ? 'Aucun utilisateur ne correspond à cette recherche.' : 'Aucun utilisateur.'}
         data={usersAffiches}
         ligneActive={(row) => row.id === editingId}
+        taillePage={25}
         columns={[
-          { key: 'prenom', label: 'Prénom', render: (v) => v || '—' },
-          { key: 'nom', label: 'Nom', render: (v) => v || '—' },
-          { key: 'email', label: 'Email' },
+          { key: 'prenom', label: 'Prénom', triable: true, render: (v) => v || '—' },
+          { key: 'nom', label: 'Nom', triable: true, render: (v) => v || '—' },
+          { key: 'email', label: 'Email', triable: true },
           {
-            key: 'role', label: 'Rôle',
+            key: 'role', label: 'Rôle', triable: true,
             render: (v) => <span style={pastilleStyle(ROLE_COLORS[String(v)] ?? COLORS.muted)}>{String(v)}</span>,
           },
           {
-            key: 'actif', label: 'Statut',
+            key: 'actif', label: 'Statut', triable: true,
             render: (_v, row) => (
               <ToggleBadge
                 actif={row.actif}
@@ -168,7 +169,7 @@ export default function UtilisateursPage() {
               />
             ),
           },
-          { key: 'dateCreation', label: 'Inscription', render: (v) => new Date(String(v)).toLocaleDateString('fr-FR') },
+          { key: 'dateCreation', label: 'Inscription', triable: true, render: (v) => new Date(String(v)).toLocaleDateString('fr-FR') },
           {
             key: 'id', label: 'Actions',
             render: (id, row) => (

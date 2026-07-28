@@ -1,2 +1,2 @@
-import UtilisateursPage from "@/pages/UtilisateursPage";
+import UtilisateursPage from "@/views/UtilisateursPage";
 export default function Page() { return <UtilisateursPage />; }

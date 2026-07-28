@@ -1,2 +1,2 @@
-import SyncMonitoringPage from "@/pages/SyncMonitoringPage";
+import SyncMonitoringPage from "@/views/SyncMonitoringPage";
 export default function Page() { return <SyncMonitoringPage />; }

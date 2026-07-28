@@ -1,2 +1,2 @@
-import ModerationPage from "@/pages/ModerationPage";
+import ModerationPage from "@/views/ModerationPage";
 export default function Page() { return <ModerationPage />; }

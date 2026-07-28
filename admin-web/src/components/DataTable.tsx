@@ -1,52 +1,107 @@
 'use client';
 
-interface Column {
-  key: string;
+import type { ReactNode } from 'react';
+import { COLORS } from '../constants/theme';
+
+export interface Column<T> {
+  key: keyof T & string;
   label: string;
-  render?: (value: any, row: any) => React.ReactNode;
+  render?: (value: T[keyof T], row: T) => ReactNode;
 }
 
-interface Props {
-  columns: Column[];
-  data: any[];
+interface Props<T> {
+  columns: Column<T>[];
+  data: T[];
+  /** Identifiant stable de ligne. Par défaut `row.id` s'il existe, sinon l'index. */
+  rowKey?: (row: T, index: number) => string;
+  loading?: boolean;
+  erreur?: string;
+  onReessayer?: () => void;
   emptyMessage?: string;
 }
 
-export default function DataTable({ columns, data, emptyMessage = 'Aucune donnée.' }: Props) {
-  return (
-    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-      <thead>
+const cellulePleineLargeur: React.CSSProperties = {
+  padding: 30,
+  textAlign: 'center',
+  color: COLORS.mutedLight,
+  fontSize: 13,
+};
+
+export default function DataTable<T extends Record<string, any>>({
+  columns, data, rowKey, loading = false, erreur = '', onReessayer,
+  emptyMessage = 'Aucune donnée.',
+}: Props<T>) {
+  const cleLigne = rowKey ?? ((row: T, index: number) => String(row.id ?? index));
+
+  // Chargement, erreur et vide sont trois états distincts : les confondre laissait
+  // croire à une absence de données alors que la requête avait échoué.
+  const corps = () => {
+    if (loading) {
+      return (
         <tr>
-          {columns.map((col) => (
-            <th key={col.key} style={{
-              textAlign: 'left', color: '#999', fontWeight: 600, fontSize: 11,
-              textTransform: 'uppercase', padding: '10px 12px',
-              borderBottom: '1px solid #9B7A2F',
-            }}>
-              {col.label}
-            </th>
-          ))}
+          <td colSpan={columns.length} style={cellulePleineLargeur}>
+            Chargement…
+          </td>
         </tr>
-      </thead>
-      <tbody>
-        {data.length === 0 ? (
+      );
+    }
+    if (erreur) {
+      return (
+        <tr>
+          <td colSpan={columns.length} style={{ ...cellulePleineLargeur, color: COLORS.red }}>
+            {erreur}
+            {onReessayer && (
+              <button
+                onClick={onReessayer}
+                style={{
+                  marginLeft: 12, padding: '4px 12px', fontSize: 12, cursor: 'pointer',
+                  background: 'transparent', border: `1px solid ${COLORS.red}`,
+                  color: COLORS.red, borderRadius: 3,
+                }}
+              >
+                Réessayer
+              </button>
+            )}
+          </td>
+        </tr>
+      );
+    }
+    if (data.length === 0) {
+      return (
+        <tr>
+          <td colSpan={columns.length} style={cellulePleineLargeur}>{emptyMessage}</td>
+        </tr>
+      );
+    }
+    return data.map((row, i) => (
+      <tr key={cleLigne(row, i)} style={{ borderBottom: `1px solid ${COLORS.line}` }}>
+        {columns.map((col) => (
+          <td key={col.key} style={{ padding: '11px 12px', color: COLORS.white }}>
+            {col.render ? col.render(row[col.key], row) : (row[col.key] as ReactNode)}
+          </td>
+        ))}
+      </tr>
+    ));
+  };
+
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+        <thead>
           <tr>
-            <td colSpan={columns.length} style={{ padding: 30, textAlign: 'center', color: '#666' }}>
-              {emptyMessage}
-            </td>
+            {columns.map((col) => (
+              <th key={col.key} style={{
+                textAlign: 'left', color: COLORS.muted, fontWeight: 600, fontSize: 11,
+                textTransform: 'uppercase', padding: '10px 12px', whiteSpace: 'nowrap',
+                borderBottom: `1px solid ${COLORS.goldDark}`,
+              }}>
+                {col.label}
+              </th>
+            ))}
           </tr>
-        ) : (
-          data.map((row, i) => (
-            <tr key={i} style={{ borderBottom: '1px solid #333' }}>
-              {columns.map((col) => (
-                <td key={col.key} style={{ padding: '11px 12px', color: '#eee' }}>
-                  {col.render ? col.render(row[col.key], row) : row[col.key]}
-                </td>
-              ))}
-            </tr>
-          ))
-        )}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>{corps()}</tbody>
+      </table>
+    </div>
   );
 }

@@ -1,9 +1,13 @@
 'use client';
 
+import { COLORS } from '../constants/theme';
+
+// « Synchronisé » passe au vert plutôt qu'à l'or : la couleur de marque servait aussi à
+// signaler un succès, ce qui la rendait illisible en tant que signal d'état.
 const CONFIG: Record<string, { color: string; label: string }> = {
-  synced: { color: '#D4A843', label: 'Synchronisé' },
-  pending: { color: '#F59E0B', label: 'En attente' },
-  failed: { color: '#EF4444', label: 'Échoué' },
+  synced: { color: COLORS.green, label: 'Synchronisé' },
+  pending: { color: COLORS.orange, label: 'En attente' },
+  failed: { color: COLORS.red, label: 'Échoué' },
 };
 
 export default function SyncStatusBadge({ statut }: { statut: string }) {

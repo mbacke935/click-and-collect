@@ -56,6 +56,7 @@ function decodeToken(token: string): JwtPayload | null {
 }
 
 export interface AdminSession {
+  id: string;
   email: string;
   role: string;
 }
@@ -72,7 +73,7 @@ export function getValidSession(): AdminSession | null {
     localStorage.removeItem('adminToken');
     return null;
   }
-  return { email: payload.email, role: payload.role };
+  return { id: payload.sub, email: payload.email, role: payload.role };
 }
 
 export function isLoggedIn(): boolean {

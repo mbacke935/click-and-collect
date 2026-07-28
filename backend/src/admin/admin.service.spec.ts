@@ -1,8 +1,9 @@
 import { Test } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import * as bcrypt from 'bcrypt';
 import { AdminService } from './admin.service';
-import { User } from '../users/entities/user.entity';
+import { User, UserRole } from '../users/entities/user.entity';
 import { Boutique } from '../boutiques/entities/boutique.entity';
 import { Commande, CommandeStatut } from '../commandes/entities/commande.entity';
 import { Produit } from '../produits/entities/produit.entity';
@@ -19,7 +20,10 @@ describe('AdminService', () => {
   let syncService: any;
 
   beforeEach(async () => {
-    usersRepo = { findOne: jest.fn(), save: jest.fn((x) => Promise.resolve(x)), count: jest.fn() };
+    usersRepo = {
+      findOne: jest.fn(), save: jest.fn((x) => Promise.resolve({ id: 'new-id', ...x })),
+      count: jest.fn(), create: jest.fn((x) => x), remove: jest.fn(),
+    };
     boutiquesRepo = { count: jest.fn() };
     commandesRepo = {
       count: jest.fn(),
@@ -66,6 +70,76 @@ describe('AdminService', () => {
       const result = await service.toggleUser('u1', false);
       expect(result).not.toHaveProperty('passwordHash');
       expect((result as any).actif).toBe(false);
+    });
+  });
+
+  describe('createUser', () => {
+    it("refuse la création si l'email existe déjà", async () => {
+      usersRepo.findOne.mockResolvedValue({ id: 'existant' });
+      await expect(
+        service.createUser({ email: 'a@a.com', password: 'password123', role: UserRole.CLIENT }),
+      ).rejects.toThrow(ConflictException);
+      expect(usersRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('hache le mot de passe et ne renvoie jamais le hash', async () => {
+      usersRepo.findOne.mockResolvedValue(null);
+      const result: any = await service.createUser({
+        email: 'nouveau@a.com', password: 'password123', role: UserRole.COMMERCANT,
+      });
+
+      expect(result).not.toHaveProperty('passwordHash');
+      expect(result.email).toBe('nouveau@a.com');
+      const savedArg = usersRepo.save.mock.calls[0][0];
+      expect(savedArg.passwordHash).not.toBe('password123');
+      expect(await bcrypt.compare('password123', savedArg.passwordHash)).toBe(true);
+    });
+  });
+
+  describe('updateUser', () => {
+    it("lève une NotFoundException si l'utilisateur est introuvable", async () => {
+      usersRepo.findOne.mockResolvedValueOnce(null);
+      await expect(service.updateUser('inconnu', { nom: 'X' })).rejects.toThrow(NotFoundException);
+    });
+
+    it('refuse de rétrograder le dernier administrateur restant', async () => {
+      usersRepo.findOne.mockResolvedValueOnce({ id: 'admin1', role: UserRole.ADMINISTRATEUR, email: 'a@a.com' });
+      usersRepo.count.mockResolvedValue(1);
+      await expect(
+        service.updateUser('admin1', { role: UserRole.CLIENT }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it("autorise de rétrograder un administrateur s'il en reste au moins un autre", async () => {
+      usersRepo.findOne.mockResolvedValueOnce({ id: 'admin1', role: UserRole.ADMINISTRATEUR, email: 'a@a.com' });
+      usersRepo.count.mockResolvedValue(2);
+      const result: any = await service.updateUser('admin1', { role: UserRole.CLIENT });
+      expect(result.role).toBe(UserRole.CLIENT);
+    });
+  });
+
+  describe('deleteUser', () => {
+    it('refuse la suppression de son propre compte', async () => {
+      await expect(service.deleteUser('user1', 'user1')).rejects.toThrow(ForbiddenException);
+      expect(usersRepo.remove).not.toHaveBeenCalled();
+    });
+
+    it("lève une NotFoundException si l'utilisateur est introuvable", async () => {
+      usersRepo.findOne.mockResolvedValue(null);
+      await expect(service.deleteUser('inconnu', 'admin1')).rejects.toThrow(NotFoundException);
+    });
+
+    it('refuse de supprimer le dernier administrateur restant', async () => {
+      usersRepo.findOne.mockResolvedValue({ id: 'admin2', role: UserRole.ADMINISTRATEUR });
+      usersRepo.count.mockResolvedValue(1);
+      await expect(service.deleteUser('admin2', 'admin1')).rejects.toThrow(ForbiddenException);
+      expect(usersRepo.remove).not.toHaveBeenCalled();
+    });
+
+    it("supprime un compte client sans contrainte particulière", async () => {
+      usersRepo.findOne.mockResolvedValue({ id: 'client1', role: UserRole.CLIENT });
+      await service.deleteUser('client1', 'admin1');
+      expect(usersRepo.remove).toHaveBeenCalledWith({ id: 'client1', role: UserRole.CLIENT });
     });
   });
 

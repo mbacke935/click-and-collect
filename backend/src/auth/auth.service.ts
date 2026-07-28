@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -9,6 +10,7 @@ import * as bcrypt from 'bcrypt';
 import { UsersService } from '../users/users.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { UserRole } from '../users/entities/user.entity';
 
 const SALT_ROUNDS = 10;
@@ -64,6 +66,28 @@ export class AuthService {
     }
 
     return this.buildToken(user.id, user.email, user.role);
+  }
+
+  // Changement de mot de passe par le titulaire du compte lui-même : exige l'ancien mot
+  // de passe (pas seulement un JWT valide, au cas où la session aurait été compromise) et
+  // une confirmation du nouveau, pour éviter une faute de frappe silencieuse.
+  async changePassword(userId: string, dto: ChangePasswordDto): Promise<void> {
+    if (dto.nouveauMotDePasse !== dto.confirmationMotDePasse) {
+      throw new BadRequestException('La confirmation ne correspond pas au nouveau mot de passe.');
+    }
+
+    const user = await this.usersService.findById(userId);
+    if (!user) {
+      throw new UnauthorizedException('Identifiants invalides.');
+    }
+
+    const ancienValide = await bcrypt.compare(dto.ancienMotDePasse, user.passwordHash);
+    if (!ancienValide) {
+      throw new UnauthorizedException("L'ancien mot de passe est incorrect.");
+    }
+
+    const passwordHash = await bcrypt.hash(dto.nouveauMotDePasse, SALT_ROUNDS);
+    await this.usersService.updatePasswordHash(userId, passwordHash);
   }
 
   private buildToken(userId: string, email: string, role: string) {

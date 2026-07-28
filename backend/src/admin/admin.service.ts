@@ -1,12 +1,17 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import * as bcrypt from 'bcrypt';
 import { User, UserRole } from '../users/entities/user.entity';
 import { Boutique } from '../boutiques/entities/boutique.entity';
 import { Commande, CommandeStatut } from '../commandes/entities/commande.entity';
 import { Produit } from '../produits/entities/produit.entity';
 import { ParametresPlateforme } from './entities/parametres-plateforme.entity';
 import { SyncService } from '../sync/sync.service';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
+
+const SALT_ROUNDS = 10;
 
 @Injectable()
 export class AdminService {
@@ -58,6 +63,55 @@ export class AdminService {
     user.actif = actif;
     const { passwordHash, ...safe } = await this.usersRepository.save(user);
     return safe;
+  }
+
+  async createUser(dto: CreateUserDto): Promise<Omit<User, 'passwordHash'>> {
+    const existing = await this.usersRepository.findOne({ where: { email: dto.email } });
+    if (existing) throw new ConflictException('Un compte existe déjà avec cet email.');
+
+    const passwordHash = await bcrypt.hash(dto.password, SALT_ROUNDS);
+    const user = this.usersRepository.create({
+      email: dto.email, passwordHash, role: dto.role, nom: dto.nom, prenom: dto.prenom,
+    });
+    const { passwordHash: _, ...safe } = await this.usersRepository.save(user);
+    return safe;
+  }
+
+  async updateUser(id: string, dto: UpdateUserDto): Promise<Omit<User, 'passwordHash'>> {
+    const user = await this.usersRepository.findOne({ where: { id } });
+    if (!user) throw new NotFoundException(`Utilisateur ${id} introuvable.`);
+
+    if (dto.email && dto.email !== user.email) {
+      const existing = await this.usersRepository.findOne({ where: { email: dto.email } });
+      if (existing) throw new ConflictException('Un compte existe déjà avec cet email.');
+    }
+    if (dto.role && dto.role !== UserRole.ADMINISTRATEUR) {
+      await this.assertNotLastAdmin(user, "rétrograder le dernier compte administrateur restant");
+    }
+
+    Object.assign(user, dto);
+    const { passwordHash, ...safe } = await this.usersRepository.save(user);
+    return safe;
+  }
+
+  async deleteUser(id: string, requesterId: string): Promise<void> {
+    if (id === requesterId) {
+      throw new ForbiddenException('Vous ne pouvez pas supprimer votre propre compte.');
+    }
+    const user = await this.usersRepository.findOne({ where: { id } });
+    if (!user) throw new NotFoundException(`Utilisateur ${id} introuvable.`);
+    await this.assertNotLastAdmin(user, 'supprimer le dernier compte administrateur restant');
+    await this.usersRepository.remove(user);
+  }
+
+  // Empêche de se retrouver sans aucun administrateur (verrouillage de la plateforme) en
+  // rétrogradant ou supprimant le dernier compte administrateur.
+  private async assertNotLastAdmin(user: User, action: string): Promise<void> {
+    if (user.role !== UserRole.ADMINISTRATEUR) return;
+    const nbAdmins = await this.usersRepository.count({ where: { role: UserRole.ADMINISTRATEUR } });
+    if (nbAdmins <= 1) {
+      throw new ForbiddenException(`Impossible de ${action}.`);
+    }
   }
 
   findAllBoutiques(): Promise<Boutique[]> {

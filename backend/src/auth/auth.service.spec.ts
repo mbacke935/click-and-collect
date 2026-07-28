@@ -1,5 +1,5 @@
 import { Test } from '@nestjs/testing';
-import { ConflictException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { AuthService } from './auth.service';
@@ -8,11 +8,14 @@ import { UserRole } from '../users/entities/user.entity';
 
 describe('AuthService', () => {
   let service: AuthService;
-  let usersService: { findByEmail: jest.Mock; create: jest.Mock };
+  let usersService: { findByEmail: jest.Mock; create: jest.Mock; findById: jest.Mock; updatePasswordHash: jest.Mock };
   let jwtService: { sign: jest.Mock };
 
   beforeEach(async () => {
-    usersService = { findByEmail: jest.fn(), create: jest.fn() };
+    usersService = {
+      findByEmail: jest.fn(), create: jest.fn(),
+      findById: jest.fn(), updatePasswordHash: jest.fn(),
+    };
     jwtService = { sign: jest.fn().mockReturnValue('signed-token') };
 
     const module = await Test.createTestingModule({
@@ -83,6 +86,42 @@ describe('AuthService', () => {
       await expect(
         service.login({ email: 'a@a.com', password: 'bonmdp123' }),
       ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('changePassword', () => {
+    it('rejette si la confirmation ne correspond pas au nouveau mot de passe', async () => {
+      await expect(
+        service.changePassword('u1', {
+          ancienMotDePasse: 'ancien', nouveauMotDePasse: 'nouveauMdp123', confirmationMotDePasse: 'autreChose',
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(usersService.findById).not.toHaveBeenCalled();
+    });
+
+    it("rejette si l'ancien mot de passe est incorrect", async () => {
+      const passwordHash = await bcrypt.hash('bonmdp123', 10);
+      usersService.findById.mockResolvedValue({ id: 'u1', passwordHash });
+
+      await expect(
+        service.changePassword('u1', {
+          ancienMotDePasse: 'mauvais', nouveauMotDePasse: 'nouveauMdp123', confirmationMotDePasse: 'nouveauMdp123',
+        }),
+      ).rejects.toThrow(UnauthorizedException);
+      expect(usersService.updatePasswordHash).not.toHaveBeenCalled();
+    });
+
+    it('met à jour le hash quand ancien mot de passe et confirmation sont corrects', async () => {
+      const passwordHash = await bcrypt.hash('bonmdp123', 10);
+      usersService.findById.mockResolvedValue({ id: 'u1', passwordHash });
+
+      await service.changePassword('u1', {
+        ancienMotDePasse: 'bonmdp123', nouveauMotDePasse: 'nouveauMdp123', confirmationMotDePasse: 'nouveauMdp123',
+      });
+
+      expect(usersService.updatePasswordHash).toHaveBeenCalledWith('u1', expect.any(String));
+      const newHash = usersService.updatePasswordHash.mock.calls[0][1];
+      expect(await bcrypt.compare('nouveauMdp123', newHash)).toBe(true);
     });
   });
 });

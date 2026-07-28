@@ -22,7 +22,7 @@ describe('getValidSession — garde de session du back-office', () => {
     const token = buildToken({ sub: 'u1', email: 'admin@test.com', role: 'administrateur', exp: nowSeconds() + 3600 });
     localStorage.setItem('adminToken', token);
 
-    expect(getValidSession()).toEqual({ email: 'admin@test.com', role: 'administrateur' });
+    expect(getValidSession()).toEqual({ id: 'u1', email: 'admin@test.com', role: 'administrateur' });
     expect(isLoggedIn()).toBe(true);
   });
 

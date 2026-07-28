@@ -1,9 +1,11 @@
-import { Body, Controller, Get, Param, Patch, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { AdminGuard } from '../common/guards/admin.guard';
 import { UserRole } from '../users/entities/user.entity';
 import { UpdateParametresDto } from './dto/update-parametres.dto';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 
 @UseGuards(JwtAuthGuard, AdminGuard)
 @Controller('admin')
@@ -15,6 +17,19 @@ export class AdminController {
 
   @Get('users')
   findUsers(@Query('role') role?: UserRole) { return this.adminService.findUsers(role); }
+
+  @Post('users')
+  createUser(@Body() dto: CreateUserDto) { return this.adminService.createUser(dto); }
+
+  @Patch('users/:id')
+  updateUser(@Param('id') id: string, @Body() dto: UpdateUserDto) {
+    return this.adminService.updateUser(id, dto);
+  }
+
+  @Delete('users/:id')
+  deleteUser(@Param('id') id: string, @Request() req) {
+    return this.adminService.deleteUser(id, req.user.userId);
+  }
 
   @Patch('users/:id/toggle')
   toggleUser(@Param('id') id: string, @Query('active') active: string) {

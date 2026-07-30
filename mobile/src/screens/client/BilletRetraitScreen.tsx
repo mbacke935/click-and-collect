@@ -57,12 +57,15 @@ export default function BilletRetraitScreen({ navigation }: any) {
             onPress={() => navigation.navigate('CommandeStatut', { commande: item })}
           >
             <View style={styles.cardRow}>
-              <Text style={styles.cardTitle}>N° {item.id.substring(0, 8).toUpperCase()}</Text>
+              <Text style={styles.cardTitle}>{item.boutiqueNom || `N° ${item.id.substring(0, 8).toUpperCase()}`}</Text>
               <StatusBadge statut={item.statut} />
             </View>
             <Text style={styles.cardSub}>
               {item.montantTotal?.toLocaleString()} FCFA · {item.creneau?.jour || '—'}
             </Text>
+            {item.boutiqueAdresse && (
+              <Text style={styles.cardAdresse} numberOfLines={1}>{item.boutiqueAdresse}</Text>
+            )}
           </TouchableOpacity>
         )}
         contentContainerStyle={{ paddingBottom: 20 }}
@@ -82,5 +85,6 @@ const styles = StyleSheet.create({
   cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   cardTitle: { color: COLORS.white, fontSize: 14, fontWeight: '600', fontFamily: 'monospace' },
   cardSub: { color: COLORS.muted, fontSize: 13, marginTop: 4 },
+  cardAdresse: { color: COLORS.mutedLight, fontSize: 12, marginTop: 2 },
   empty: { color: COLORS.muted, textAlign: 'center', marginTop: 40 },
 });

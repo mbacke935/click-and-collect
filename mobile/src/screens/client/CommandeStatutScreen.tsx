@@ -62,10 +62,31 @@ export default function CommandeStatutScreen({ route }: any) {
       {commande.billet && (
         <QRCodeDisplay
           value={commande.billet.qrCodePayload}
-          boutique={commande.boutique_id.substring(0, 8)}
+          boutique={commande.boutiqueNom || commande.boutique_id.substring(0, 8)}
           creneau={commande.creneau ? `${commande.creneau.jour} · ${commande.creneau.heureDebut}–${commande.creneau.heureFin}` : ''}
           code={`N° ${commande.id.substring(0, 4).toUpperCase()}`}
         />
+      )}
+
+      {commande.boutiqueAdresse && (
+        <View style={styles.boutiqueBlock}>
+          <Text style={styles.boutiqueLabel}>À retirer chez</Text>
+          <Text style={styles.boutiqueNom}>{commande.boutiqueNom}</Text>
+          <Text style={styles.boutiqueAdresse}>{commande.boutiqueAdresse}</Text>
+        </View>
+      )}
+
+      {commande.panier?.lignes?.length > 0 && (
+        <View style={styles.receiptBlock}>
+          <Text style={styles.receiptTitle}>Détail du reçu</Text>
+          {commande.panier.lignes.map((ligne: any) => (
+            <View key={ligne.id} style={styles.receiptRow}>
+              <Text style={styles.receiptQty}>×{ligne.quantite}</Text>
+              <Text style={styles.receiptNom} numberOfLines={1}>{ligne.produit?.nom || 'Article'}</Text>
+              <Text style={styles.receiptPrix}>{(ligne.prixUnitaire * ligne.quantite).toLocaleString()} FCFA</Text>
+            </View>
+          ))}
+        </View>
       )}
 
       <Text style={styles.total}>
@@ -91,5 +112,21 @@ const styles = StyleSheet.create({
   lineDone: { backgroundColor: COLORS.gold },
   labels: { flexDirection: 'row', marginTop: 6 },
   labelText: { flex: 1, textAlign: 'center', fontSize: 10, color: COLORS.muted },
+  boutiqueBlock: {
+    backgroundColor: COLORS.blackCard, borderWidth: 1, borderColor: COLORS.line,
+    borderRadius: 6, padding: 14, marginTop: 4,
+  },
+  boutiqueLabel: { color: COLORS.muted, fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 },
+  boutiqueNom: { color: COLORS.white, fontSize: 15, fontWeight: '600' },
+  boutiqueAdresse: { color: COLORS.muted, fontSize: 13, marginTop: 2 },
+  receiptBlock: {
+    backgroundColor: COLORS.blackCard, borderWidth: 1, borderColor: COLORS.line,
+    borderRadius: 6, padding: 14, marginTop: 12,
+  },
+  receiptTitle: { color: COLORS.gold, fontSize: 13, fontWeight: '700', marginBottom: 10, textTransform: 'uppercase' },
+  receiptRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 6 },
+  receiptQty: { color: COLORS.muted, fontSize: 13, width: 28 },
+  receiptNom: { flex: 1, color: COLORS.white, fontSize: 14 },
+  receiptPrix: { color: COLORS.white, fontFamily: 'monospace', fontSize: 13 },
   total: { color: COLORS.gold, fontSize: 16, fontWeight: '700', textAlign: 'center', marginTop: 10 },
 });

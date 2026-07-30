@@ -30,7 +30,7 @@ describe('CommandesService', () => {
     billetsRepo = { create: jest.fn((x) => x), save: jest.fn((x) => Promise.resolve(x)) };
     paniersService = { findOne: jest.fn(), valider: jest.fn() };
     creneauxService = { reserver: jest.fn(), liberer: jest.fn() };
-    boutiquesService = { findOne: jest.fn() };
+    boutiquesService = { findOne: jest.fn(), findByIds: jest.fn().mockResolvedValue([]) };
     realtimeGateway = { emitCommandeUpdate: jest.fn() };
     configService = { get: jest.fn(() => 'qr-ticket-shared-secret-dev') };
 

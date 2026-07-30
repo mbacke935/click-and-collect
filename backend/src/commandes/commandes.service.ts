@@ -13,6 +13,16 @@ import { BoutiquesService } from '../boutiques/boutiques.service';
 import { UserRole } from '../users/entities/user.entity';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 
+// Commande augmentée du nom et de l'adresse de sa boutique — nécessaires pour que le reçu
+// et le billet restent lisibles hors-ligne (cf. dossier de spécifications §Module 3 :
+// « l'historique complet des articles achetés et l'adresse du magasin restent accessibles
+// hors-ligne »). Non fusionné en relation TypeORM directe : voir la remarque sur
+// Commande.boutique_id dans commande.entity.ts.
+export type CommandeAvecBoutique = Commande & {
+  boutiqueNom: string | null;
+  boutiqueAdresse: string | null;
+};
+
 @Injectable()
 export class CommandesService {
   constructor(
@@ -25,7 +35,7 @@ export class CommandesService {
     private readonly configService: ConfigService,
   ) {}
 
-  async create(dto: CreateCommandeDto, clientId: string): Promise<Commande> {
+  async create(dto: CreateCommandeDto, clientId: string): Promise<CommandeAvecBoutique> {
     const panier = await this.paniersService.findOne(dto.panier_id, clientId);
     if (!panier.lignes || panier.lignes.length === 0)
       throw new BadRequestException('Le panier est vide.');
@@ -69,41 +79,61 @@ export class CommandesService {
 
     await this.paniersService.valider(panier.id);
 
-    const commandeComplete = await this.findOne(saved.id);
+    const commandeComplete = await this.findOneEnrichi(saved.id);
     this.realtimeGateway.emitCommandeUpdate(commandeComplete);
     return commandeComplete;
   }
 
   async findOne(id: string): Promise<Commande> {
     const c = await this.commandesRepository.findOne({
-      where: { id }, relations: { billet: true, creneau: true, panier: true },
+      where: { id },
+      relations: { billet: true, creneau: true, panier: { lignes: { produit: true } } },
     });
     if (!c) throw new NotFoundException(`Commande ${id} introuvable.`);
     return c;
   }
 
+  // Version enrichie de findOne : ajoute le nom et l'adresse de la boutique, indispensables
+  // au reçu et au billet consultés hors-ligne (voir CommandeAvecBoutique ci-dessus).
+  async findOneEnrichi(id: string): Promise<CommandeAvecBoutique> {
+    const [enrichie] = await this.enrichirAvecBoutique([await this.findOne(id)]);
+    return enrichie;
+  }
+
+  private async enrichirAvecBoutique(commandes: Commande[]): Promise<CommandeAvecBoutique[]> {
+    const boutiqueIds = [...new Set(commandes.map((c) => c.boutique_id))];
+    const boutiques = await this.boutiquesService.findByIds(boutiqueIds);
+    const parBoutique = new Map(boutiques.map((b) => [b.id, b]));
+    return commandes.map((c) => ({
+      ...c,
+      boutiqueNom: parBoutique.get(c.boutique_id)?.nom ?? null,
+      boutiqueAdresse: parBoutique.get(c.boutique_id)?.adresse ?? null,
+    }));
+  }
+
   // À utiliser depuis les routes HTTP : vérifie que l'appelant est le client de la commande,
   // le commerçant de la boutique concernée, ou un administrateur.
-  async findOneForUser(id: string, userId: string, userRole: string): Promise<Commande> {
-    const commande = await this.findOne(id);
+  async findOneForUser(id: string, userId: string, userRole: string): Promise<CommandeAvecBoutique> {
+    const commande = await this.findOneEnrichi(id);
     if (userRole === UserRole.ADMINISTRATEUR || commande.client_id === userId) return commande;
     const boutique = await this.boutiquesService.findOne(commande.boutique_id);
     if (boutique.commercant_id === userId) return commande;
     throw new ForbiddenException('Accès refusé.');
   }
 
-  findByClient(clientId: string): Promise<Commande[]> {
-    return this.commandesRepository.find({
+  async findByClient(clientId: string): Promise<CommandeAvecBoutique[]> {
+    const commandes = await this.commandesRepository.find({
       where: { client_id: clientId },
-      relations: { billet: true, creneau: true },
+      relations: { billet: true, creneau: true, panier: { lignes: { produit: true } } },
       order: { dateCommande: 'DESC' },
     });
+    return this.enrichirAvecBoutique(commandes);
   }
 
   findByBoutique(boutiqueId: string): Promise<Commande[]> {
     return this.commandesRepository.find({
       where: { boutique_id: boutiqueId },
-      relations: { billet: true, creneau: true },
+      relations: { billet: true, creneau: true, panier: { lignes: { produit: true } } },
       order: { dateCommande: 'DESC' },
     });
   }

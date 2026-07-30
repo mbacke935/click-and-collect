@@ -1,6 +1,6 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Boutique } from './entities/boutique.entity';
 import { CreateBoutiqueDto } from './dto/create-boutique.dto';
 import { UpdateBoutiqueDto } from './dto/update-boutique.dto';
@@ -25,6 +25,13 @@ export class BoutiquesService {
 
   findByCommercant(commercantId: string): Promise<Boutique[]> {
     return this.boutiquesRepository.find({ where: { commercant_id: commercantId }, order: { dateCreation: 'DESC' } });
+  }
+
+  // Chargement en masse (sans échec si un id est introuvable) : utilisé pour enrichir des
+  // listes d'entités portant un boutique_id brut (voir CommandesService.enrichirAvecBoutique).
+  findByIds(ids: string[]): Promise<Boutique[]> {
+    if (ids.length === 0) return Promise.resolve([]);
+    return this.boutiquesRepository.findBy({ id: In(ids) });
   }
 
   async create(dto: CreateBoutiqueDto, commercantId: string): Promise<Boutique> {

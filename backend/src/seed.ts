@@ -73,7 +73,7 @@ async function bootstrap() {
     statutCible: CommandeStatut,
   ): Promise<Commande> {
     const existantes = await commandesService.findByClient(client.id);
-    let commande = existantes.find((c) => c.boutique_id === boutique.id);
+    let commande: Commande | undefined = existantes.find((c) => c.boutique_id === boutique.id);
     if (!commande) {
       const produits = await produitsService.findByBoutique(boutique.id);
       let panier = await paniersService.ajouterArticle(client.id, boutique.id, {

@@ -8,7 +8,7 @@ import api from '../../services/api';
 import StatusBadge from '../../components/StatusBadge';
 import { useAuth } from '../../context/AuthContext';
 import { connectSocket } from '../../services/socketService';
-import { flushSyncQueue } from '../../services/syncService';
+import { flushSyncQueue, countPendingEvents } from '../../services/syncService';
 import { saveCommandes, getCommandesHorsLigneParBoutique, setCache, getCache } from '../../services/offlineDb';
 
 const FILTRES = ['recue', 'en_preparation', 'prete', 'recuperee'];
@@ -23,6 +23,7 @@ export default function DashboardScreen({ navigation }: any) {
   const [filtre, setFiltre] = useState('recue');
   const [loading, setLoading] = useState(true);
   const [horsLigne, setHorsLigne] = useState(false);
+  const [enAttenteSync, setEnAttenteSync] = useState(0);
 
   // Clé du cache local (chiffré) où l'on garde la liste des boutiques du commerçant :
   // sans réseau, /boutiques/me/boutiques est injoignable, mais il faut quand même savoir
@@ -35,11 +36,14 @@ export default function DashboardScreen({ navigation }: any) {
   // périmées (ex. toujours "aucune boutique" juste après en avoir créé une).
   useFocusEffect(
     useCallback(() => {
-      // Tentative opportuniste de rattrapage : si des retraits ont été validés hors-ligne
-      // (voir ScanRetraitScreen), on essaie de les transmettre dès que ce tableau de bord
-      // est ouvert avec une connexion disponible.
-      flushSyncQueue();
       (async () => {
+        // Tentative opportuniste de rattrapage : si des retraits ont été validés hors-ligne
+        // (voir ScanRetraitScreen), on essaie de les transmettre dès que ce tableau de bord
+        // est ouvert avec une connexion disponible, avant de recompter ce qu'il en reste
+        // (voir cas d'utilisation Commerçant "Consulter les commandes en attente de sync").
+        await flushSyncQueue();
+        setEnAttenteSync(await countPendingEvents());
+
         let bList: any[] = [];
         let boutiquesHorsLigne = false;
         try {
@@ -108,6 +112,13 @@ export default function DashboardScreen({ navigation }: any) {
         <View style={styles.offlineBadge}>
           <Text style={styles.offlineText}>Hors ligne — dernières commandes connues</Text>
         </View>
+      )}
+      {enAttenteSync > 0 && (
+        <TouchableOpacity style={styles.syncBadge} onPress={() => navigation.navigate('SyncEnAttente')}>
+          <Text style={styles.syncBadgeText}>
+            {enAttenteSync} retrait{enAttenteSync > 1 ? 's' : ''} en attente de synchronisation →
+          </Text>
+        </TouchableOpacity>
       )}
       {boutiques.length === 0 ? (
         <View style={styles.emptyBoutique}>
@@ -196,6 +207,8 @@ const styles = StyleSheet.create({
   logout: { color: COLORS.muted, fontSize: 13, fontWeight: '600' },
   offlineBadge: { backgroundColor: COLORS.blackLighter, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 4, marginBottom: 14 },
   offlineText: { color: COLORS.muted, fontSize: 12, textAlign: 'center' },
+  syncBadge: { backgroundColor: 'rgba(212,168,67,0.12)', borderWidth: 1, borderColor: COLORS.goldDark, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 4, marginBottom: 14 },
+  syncBadgeText: { color: COLORS.gold, fontSize: 12, fontWeight: '600', textAlign: 'center' },
   emptyBoutique: { backgroundColor: COLORS.blackCard, borderWidth: 1, borderColor: COLORS.line, borderRadius: 6, padding: 18, marginTop: 20 },
   emptyBoutiqueText: { color: COLORS.muted, fontSize: 14, lineHeight: 20, marginBottom: 16, textAlign: 'center' },
   btn: { backgroundColor: COLORS.gold, paddingVertical: 14, borderRadius: 6, alignItems: 'center' },

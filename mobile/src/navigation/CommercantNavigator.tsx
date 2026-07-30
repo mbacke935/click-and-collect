@@ -8,6 +8,7 @@ import CatalogueManagerScreen from '../screens/commercant/CatalogueManagerScreen
 import CreneauxManagerScreen from '../screens/commercant/CreneauxManagerScreen';
 import HorairesManagerScreen from '../screens/commercant/HorairesManagerScreen';
 import FicheBoutiqueScreen from '../screens/commercant/FicheBoutiqueScreen';
+import SyncEnAttenteScreen from '../screens/commercant/SyncEnAttenteScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -28,6 +29,7 @@ export default function CommercantNavigator() {
       <Stack.Screen name="CreneauxManager" component={CreneauxManagerScreen} options={{ title: 'Créneaux' }} />
       <Stack.Screen name="HorairesManager" component={HorairesManagerScreen} options={{ title: 'Horaires' }} />
       <Stack.Screen name="FicheBoutique" component={FicheBoutiqueScreen} options={{ title: 'Ma boutique' }} />
+      <Stack.Screen name="SyncEnAttente" component={SyncEnAttenteScreen} options={{ title: 'Synchronisation' }} />
     </Stack.Navigator>
   );
 }

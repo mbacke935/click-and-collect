@@ -22,6 +22,19 @@ export class ProduitsService {
     });
   }
 
+  // À la différence de findByBoutique (vitrine publique, filtrée aux produits actifs),
+  // renvoie tout le catalogue — y compris les produits désactivés — pour que le
+  // commerçant puisse les retrouver et les réactiver depuis son écran de gestion.
+  async findByBoutiqueForUser(boutiqueId: string, userId: string, userRole: string): Promise<Produit[]> {
+    const boutique = await this.boutiquesService.findOne(boutiqueId);
+    if (boutique.commercant_id !== userId && userRole !== UserRole.ADMINISTRATEUR)
+      throw new ForbiddenException('Accès refusé.');
+    return this.produitsRepository.find({
+      where: { boutique_id: boutiqueId },
+      order: { categorie: 'ASC', nom: 'ASC' },
+    });
+  }
+
   async findOne(id: string): Promise<Produit> {
     const p = await this.produitsRepository.findOne({ where: { id } });
     if (!p) throw new NotFoundException(`Produit ${id} introuvable.`);
@@ -44,12 +57,19 @@ export class ProduitsService {
     return this.produitsRepository.save(produit);
   }
 
-  async remove(id: string, userId: string, userRole: string): Promise<void> {
+  // Désactive le produit plutôt que de le supprimer physiquement : un produit déjà
+  // commandé est référencé par des lignes de panier/commande (onDelete: 'CASCADE' sur
+  // LignePanier.produit) — une suppression définitive effacerait donc rétroactivement le
+  // détail des commandes passées qui le contiennent. `actif: false` le retire du catalogue
+  // client (voir findByBoutique) tout en préservant l'historique, et reste réversible via
+  // update({ actif: true }).
+  async desactiver(id: string, userId: string, userRole: string): Promise<Produit> {
     const produit = await this.findOne(id);
     const boutique = await this.boutiquesService.findOne(produit.boutique_id);
     if (boutique.commercant_id !== userId && userRole !== UserRole.ADMINISTRATEUR)
       throw new ForbiddenException('Accès refusé.');
-    await this.produitsRepository.remove(produit);
+    produit.actif = false;
+    return this.produitsRepository.save(produit);
   }
 
   // Verrou transactionnel pessimiste — même logique que CreneauxService.reserver, pour

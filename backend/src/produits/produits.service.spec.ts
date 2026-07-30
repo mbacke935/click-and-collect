@@ -87,6 +87,57 @@ describe('ProduitsService', () => {
     });
   });
 
+  describe('desactiver', () => {
+    it("refuse la désactivation par un autre commerçant que le propriétaire", async () => {
+      produitsRepo.findOne.mockResolvedValue({ id: 'p1', boutique_id: 'b1', actif: true });
+      boutiquesService.findOne.mockResolvedValue({ id: 'b1', commercant_id: 'commercant-1' });
+      await expect(
+        service.desactiver('p1', 'un-autre-user', UserRole.COMMERCANT),
+      ).rejects.toThrow(ForbiddenException);
+      expect(produitsRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('désactive le produit (actif: false) sans le supprimer physiquement', async () => {
+      const produit = { id: 'p1', boutique_id: 'b1', actif: true };
+      produitsRepo.findOne.mockResolvedValue(produit);
+      boutiquesService.findOne.mockResolvedValue({ id: 'b1', commercant_id: 'commercant-1' });
+
+      const result = await service.desactiver('p1', 'commercant-1', UserRole.COMMERCANT);
+
+      expect(result.actif).toBe(false);
+      expect(produitsRepo.save).toHaveBeenCalledWith(expect.objectContaining({ actif: false }));
+      expect(produitsRepo.remove).not.toHaveBeenCalled();
+    });
+
+    it('autorise un administrateur à désactiver le produit de n\'importe quelle boutique', async () => {
+      produitsRepo.findOne.mockResolvedValue({ id: 'p1', boutique_id: 'b1', actif: true });
+      boutiquesService.findOne.mockResolvedValue({ id: 'b1', commercant_id: 'commercant-1' });
+      const result = await service.desactiver('p1', 'admin-1', UserRole.ADMINISTRATEUR);
+      expect(result.actif).toBe(false);
+    });
+  });
+
+  describe('findByBoutiqueForUser', () => {
+    it("refuse la consultation par un autre commerçant que le propriétaire", async () => {
+      boutiquesService.findOne.mockResolvedValue({ id: 'b1', commercant_id: 'commercant-1' });
+      await expect(
+        service.findByBoutiqueForUser('b1', 'un-autre-user', UserRole.COMMERCANT),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('renvoie tous les produits (actifs et inactifs) au commerçant propriétaire', async () => {
+      boutiquesService.findOne.mockResolvedValue({ id: 'b1', commercant_id: 'commercant-1' });
+      produitsRepo.find = jest.fn().mockResolvedValue([{ id: 'p1', actif: true }, { id: 'p2', actif: false }]);
+
+      const result = await service.findByBoutiqueForUser('b1', 'commercant-1', UserRole.COMMERCANT);
+
+      expect(result).toHaveLength(2);
+      expect(produitsRepo.find).toHaveBeenCalledWith(expect.objectContaining({
+        where: { boutique_id: 'b1' },
+      }));
+    });
+  });
+
   describe('reserverStock', () => {
     it('décrémente le stock sous verrou transactionnel', async () => {
       const manager = fakeManager({ id: 'p1', nom: 'Pain', quantiteStock: 10 });

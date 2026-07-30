@@ -8,9 +8,13 @@ import api from '../../services/api';
 
 const VIDE = { nom: '', prix: '', categorie: '', quantiteStock: '' };
 
-// Gestion du catalogue de la boutique du commerçant : création, édition et retrait
-// (désactivation) d'un produit — cf. dossier de spécifications, cas d'utilisation
-// Commerçant "Gérer le catalogue et les stocks".
+// Gestion du catalogue de la boutique du commerçant : création, édition et
+// activation/désactivation d'un produit — cf. dossier de spécifications, cas
+// d'utilisation Commerçant "Gérer le catalogue et les stocks". Un produit désactivé
+// disparaît de la vitrine client (voir CatalogueScreen) mais reste dans l'historique des
+// commandes qui le référencent déjà ; on utilise donc /produits/gestion (et non la route
+// publique, filtrée aux produits actifs) pour que le commerçant retrouve aussi ceux qu'il
+// a désactivés et puisse les réactiver.
 export default function CatalogueManagerScreen({ route }: any) {
   const { boutiqueId } = route.params;
   const [produits, setProduits] = useState<any[]>([]);
@@ -20,7 +24,7 @@ export default function CatalogueManagerScreen({ route }: any) {
   const [saving, setSaving] = useState(false);
 
   const charger = useCallback(() => {
-    api.get(`/boutiques/${boutiqueId}/produits`)
+    api.get(`/boutiques/${boutiqueId}/produits/gestion`)
       .then(({ data }) => setProduits(data))
       .catch(() => Alert.alert('Erreur', 'Impossible de charger le catalogue.'))
       .finally(() => setLoading(false));
@@ -66,21 +70,33 @@ export default function CatalogueManagerScreen({ route }: any) {
     }
   };
 
-  const supprimer = (produit: any) => {
-    Alert.alert('Retirer ce produit ?', produit.nom, [
-      { text: 'Annuler', style: 'cancel' },
-      {
-        text: 'Retirer', style: 'destructive',
-        onPress: async () => {
-          try {
-            await api.delete(`/boutiques/${boutiqueId}/produits/${produit.id}`);
-            charger();
-          } catch (e: any) {
-            Alert.alert('Erreur', e.response?.data?.message || 'Échec de la suppression.');
-          }
+  const toggleActif = (produit: any) => {
+    const reactivation = !produit.actif;
+    Alert.alert(
+      reactivation ? 'Réactiver ce produit ?' : 'Désactiver ce produit ?',
+      reactivation
+        ? `${produit.nom} redeviendra visible dans le catalogue client.`
+        : `${produit.nom} disparaîtra du catalogue client, mais reste dans l'historique des commandes déjà passées.`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: reactivation ? 'Réactiver' : 'Désactiver',
+          style: reactivation ? 'default' : 'destructive',
+          onPress: async () => {
+            try {
+              if (reactivation) {
+                await api.patch(`/boutiques/${boutiqueId}/produits/${produit.id}`, { actif: true });
+              } else {
+                await api.delete(`/boutiques/${boutiqueId}/produits/${produit.id}`);
+              }
+              charger();
+            } catch (e: any) {
+              Alert.alert('Erreur', e.response?.data?.message || 'Échec.');
+            }
+          },
         },
-      },
-    ]);
+      ],
+    );
   };
 
   if (loading) return <View style={styles.center}><ActivityIndicator color={COLORS.gold} size="large" /></View>;
@@ -94,14 +110,24 @@ export default function CatalogueManagerScreen({ route }: any) {
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingBottom: 8 }}
         renderItem={({ item }) => (
-          <TouchableOpacity style={styles.card} onPress={() => startEdit(item)} onLongPress={() => supprimer(item)}>
+          <TouchableOpacity
+            style={[styles.card, !item.actif && styles.cardInactif]}
+            onPress={() => startEdit(item)}
+          >
             <View style={styles.cardRow}>
               <Text style={styles.cardTitle}>{item.nom}</Text>
               <Text style={styles.cardPrix}>{item.prix?.toLocaleString()} FCFA</Text>
             </View>
-            <Text style={styles.cardSub}>
-              {item.categorie || 'Sans catégorie'} · stock {item.quantiteStock ?? '—'}
-            </Text>
+            <View style={styles.cardRow}>
+              <Text style={styles.cardSub}>
+                {item.categorie || 'Sans catégorie'} · stock {item.quantiteStock ?? '—'}
+              </Text>
+              <TouchableOpacity onPress={() => toggleActif(item)}>
+                <Text style={[styles.badge, item.actif ? styles.badgeActif : styles.badgeInactif]}>
+                  {item.actif ? 'Actif' : 'Désactivé'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </TouchableOpacity>
         )}
         ListEmptyComponent={<Text style={styles.empty}>Aucun produit — ajoutez-en un ci-dessous.</Text>}
@@ -147,10 +173,17 @@ const styles = StyleSheet.create({
   center: { flex: 1, backgroundColor: COLORS.black, justifyContent: 'center', alignItems: 'center' },
   title: { fontSize: 20, fontWeight: '700', color: COLORS.gold, marginBottom: 12 },
   card: { backgroundColor: COLORS.blackCard, borderWidth: 1, borderColor: COLORS.line, borderRadius: 6, padding: 12, marginBottom: 8 },
+  cardInactif: { opacity: 0.55 },
   cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   cardTitle: { color: COLORS.white, fontSize: 14, fontWeight: '600' },
   cardPrix: { color: COLORS.gold, fontSize: 13, fontFamily: 'monospace' },
   cardSub: { color: COLORS.muted, fontSize: 12, marginTop: 3 },
+  badge: {
+    fontSize: 10, fontWeight: '700', textTransform: 'uppercase', marginTop: 3,
+    paddingHorizontal: 8, paddingVertical: 2, borderRadius: 3, overflow: 'hidden',
+  },
+  badgeActif: { color: COLORS.green, backgroundColor: 'rgba(74,222,128,0.12)' },
+  badgeInactif: { color: COLORS.red, backgroundColor: 'rgba(239,68,68,0.12)' },
   empty: { color: COLORS.muted, textAlign: 'center', marginVertical: 20 },
   form: { borderTopWidth: 1, borderColor: COLORS.line, paddingTop: 14, marginTop: 6 },
   formTitle: { color: COLORS.muted, fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 },

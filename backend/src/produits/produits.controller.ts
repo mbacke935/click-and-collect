@@ -16,6 +16,15 @@ export class ProduitsController {
     return this.produitsService.findByBoutique(boutiqueId);
   }
 
+  // Déclarée avant @Get(':id') : NestJS fait correspondre les routes dans l'ordre de
+  // déclaration, un segment littéral doit donc précéder un paramètre générique pour ne
+  // pas être avalé par celui-ci.
+  @UseGuards(JwtAuthGuard)
+  @Get('gestion')
+  findAllPourGestion(@Param('boutiqueId') boutiqueId: string, @Request() req) {
+    return this.produitsService.findByBoutiqueForUser(boutiqueId, req.user.userId, req.user.role);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.produitsService.findOne(id);
@@ -36,7 +45,7 @@ export class ProduitsController {
 
   @UseGuards(JwtAuthGuard)
   @Delete(':id')
-  remove(@Param('id') id: string, @Request() req) {
-    return this.produitsService.remove(id, req.user.userId, req.user.role);
+  desactiver(@Param('id') id: string, @Request() req) {
+    return this.produitsService.desactiver(id, req.user.userId, req.user.role);
   }
 }

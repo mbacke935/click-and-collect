@@ -292,4 +292,54 @@ describe('Parcours commande de bout en bout (e2e)', () => {
       expect(libere.capaciteRestante).toBe(1);
     });
   });
+
+  describe('retrait d\'un produit du catalogue : désactivation, pas suppression', () => {
+    it('un client ne peut pas désactiver un produit', async () => {
+      await request(app.getHttpServer())
+        .delete(`/boutiques/${boutiqueId}/produits/${produitId}`)
+        .set('Authorization', `Bearer ${tokenClient}`)
+        .expect(403);
+    });
+
+    it('désactiver un produit le retire de la vitrine sans effacer les commandes qui le référencent', async () => {
+      await request(app.getHttpServer())
+        .delete(`/boutiques/${boutiqueId}/produits/${produitId}`)
+        .set('Authorization', `Bearer ${tokenCommercant}`)
+        .expect(200);
+
+      const catalogue = await request(app.getHttpServer())
+        .get(`/boutiques/${boutiqueId}/produits`)
+        .expect(200);
+      expect(catalogue.body.some((p: any) => p.id === produitId)).toBe(false);
+
+      // Le reçu de la toute première commande de ce parcours référence encore ce produit
+      // (voir plus haut) : la désactivation ne doit rien avoir cassé côté historique.
+      const commande = await request(app.getHttpServer())
+        .get(`/commandes/${commandeId}`)
+        .set('Authorization', `Bearer ${tokenClient}`)
+        .expect(200);
+      expect(commande.body.panier?.lignes?.[0]?.produit?.nom).toBe('Baguette E2E');
+
+      // Toujours visible et modifiable par le commerçant, via le canal de gestion dédié.
+      const gestion = await request(app.getHttpServer())
+        .get(`/boutiques/${boutiqueId}/produits/gestion`)
+        .set('Authorization', `Bearer ${tokenCommercant}`)
+        .expect(200);
+      const produitDesactive = gestion.body.find((p: any) => p.id === produitId);
+      expect(produitDesactive.actif).toBe(false);
+    });
+
+    it('réactiver le produit le fait réapparaître dans la vitrine', async () => {
+      await request(app.getHttpServer())
+        .patch(`/boutiques/${boutiqueId}/produits/${produitId}`)
+        .set('Authorization', `Bearer ${tokenCommercant}`)
+        .send({ actif: true })
+        .expect(200);
+
+      const catalogue = await request(app.getHttpServer())
+        .get(`/boutiques/${boutiqueId}/produits`)
+        .expect(200);
+      expect(catalogue.body.some((p: any) => p.id === produitId)).toBe(true);
+    });
+  });
 });

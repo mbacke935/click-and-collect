@@ -9,6 +9,7 @@ import { CreateCommandeDto } from './dto/create-commande.dto';
 import { UpdateStatutDto } from './dto/update-statut.dto';
 import { PaniersService } from '../paniers/paniers.service';
 import { CreneauxService } from '../creneaux/creneaux.service';
+import { ProduitsService } from '../produits/produits.service';
 import { BoutiquesService } from '../boutiques/boutiques.service';
 import { UserRole } from '../users/entities/user.entity';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
@@ -30,6 +31,7 @@ export class CommandesService {
     @InjectRepository(BilletRetrait) private readonly billetsRepository: Repository<BilletRetrait>,
     private readonly paniersService: PaniersService,
     private readonly creneauxService: CreneauxService,
+    private readonly produitsService: ProduitsService,
     private readonly boutiquesService: BoutiquesService,
     private readonly realtimeGateway: RealtimeGateway,
     private readonly configService: ConfigService,
@@ -43,6 +45,13 @@ export class CommandesService {
     const montantTotal = panier.lignes.reduce(
       (sum, l) => sum + l.prixUnitaire * l.quantite, 0,
     );
+
+    // Décrémente le stock avant de réserver le créneau : mieux vaut échouer tôt sur un
+    // produit devenu indisponible entre-temps (§8) plutôt que d'occuper inutilement un
+    // créneau pour une commande qui ne pourra de toute façon pas aboutir.
+    for (const ligne of panier.lignes) {
+      await this.produitsService.reserverStock(ligne.produit_id, ligne.quantite);
+    }
 
     await this.creneauxService.reserver(dto.creneau_id);
 
@@ -160,6 +169,11 @@ export class CommandesService {
     }
     if (dto.statut === CommandeStatut.ANNULEE && commande.creneau_id) {
       await this.creneauxService.liberer(commande.creneau_id);
+    }
+    if (dto.statut === CommandeStatut.ANNULEE && commande.panier?.lignes) {
+      for (const ligne of commande.panier.lignes) {
+        await this.produitsService.libererStock(ligne.produit_id, ligne.quantite);
+      }
     }
     const updated = await this.commandesRepository.save(commande);
     this.realtimeGateway.emitCommandeUpdate(updated);

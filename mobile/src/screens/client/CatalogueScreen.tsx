@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator,
+  View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert,
 } from 'react-native';
 import { COLORS } from '../../constants/theme';
 import api from '../../services/api';
@@ -32,11 +32,16 @@ export default function CatalogueScreen({ route, navigation }: any) {
   };
 
   const allerAuPanier = async () => {
-    // Envoie chaque article au backend
-    for (const [produit_id, quantite] of Object.entries(panier)) {
-      await api.post(`/boutiques/${boutique.id}/panier/articles`, { produit_id, quantite });
+    try {
+      // Envoie chaque article au backend
+      for (const [produit_id, quantite] of Object.entries(panier)) {
+        await api.post(`/boutiques/${boutique.id}/panier/articles`, { produit_id, quantite });
+      }
+      navigation.navigate('Panier', { boutiqueId: boutique.id, boutiqueName: boutique.nom });
+    } catch (e: any) {
+      // Ex. stock insuffisant depuis le contrôle serveur (voir ProduitsService.reserverStock)
+      Alert.alert('Erreur', e.response?.data?.message || "Impossible d'ajouter ces articles au panier.");
     }
-    navigation.navigate('Panier', { boutiqueId: boutique.id, boutiqueName: boutique.nom });
   };
 
   if (loading) return <View style={styles.center}><ActivityIndicator color={COLORS.gold} size="large" /></View>;

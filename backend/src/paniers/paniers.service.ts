@@ -38,8 +38,15 @@ export class PaniersService {
       throw new BadRequestException('Ce produit ne fait pas partie de cette boutique.');
     const panier = await this.getOrCreate(clientId, boutiqueId);
     const ligneExistante = panier.lignes.find((l) => l.produit_id === dto.produit_id);
+    // Contrôle indicatif au moment de l'ajout au panier — l'autorité reste le verrou
+    // transactionnel de ProduitsService.reserverStock au moment de la commande (deux
+    // clients peuvent avoir le même produit en panier en même temps sans conflit ici).
+    const quantiteTotale = (ligneExistante?.quantite ?? 0) + dto.quantite;
+    if (quantiteTotale > produit.quantiteStock) {
+      throw new BadRequestException(`Stock insuffisant pour "${produit.nom}" (${produit.quantiteStock} disponible(s)).`);
+    }
     if (ligneExistante) {
-      ligneExistante.quantite += dto.quantite;
+      ligneExistante.quantite = quantiteTotale;
       await this.lignesRepository.save(ligneExistante);
     } else {
       const ligne = this.lignesRepository.create({
@@ -56,8 +63,16 @@ export class PaniersService {
       where: { id: ligneId }, relations: { panier: true },
     });
     if (!ligne || ligne.panier.client_id !== clientId) throw new NotFoundException('Ligne introuvable.');
-    if (quantite <= 0) { await this.lignesRepository.remove(ligne); }
-    else { ligne.quantite = quantite; await this.lignesRepository.save(ligne); }
+    if (quantite <= 0) {
+      await this.lignesRepository.remove(ligne);
+    } else {
+      const produit = await this.produitsService.findOne(ligne.produit_id);
+      if (quantite > produit.quantiteStock) {
+        throw new BadRequestException(`Stock insuffisant pour "${produit.nom}" (${produit.quantiteStock} disponible(s)).`);
+      }
+      ligne.quantite = quantite;
+      await this.lignesRepository.save(ligne);
+    }
     return this.findOne(ligne.panier_id, clientId);
   }
 

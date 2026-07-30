@@ -1,15 +1,29 @@
 import { Test } from '@nestjs/testing';
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
 import { ProduitsService } from './produits.service';
 import { Produit } from './entities/produit.entity';
 import { BoutiquesService } from '../boutiques/boutiques.service';
 import { UserRole } from '../users/entities/user.entity';
 
+function fakeManager(produit: Partial<Produit> | null) {
+  const queryBuilder = {
+    setLock: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
+    getOne: jest.fn().mockResolvedValue(produit),
+  };
+  return {
+    createQueryBuilder: jest.fn().mockReturnValue(queryBuilder),
+    save: jest.fn().mockImplementation((p) => Promise.resolve(p)),
+  };
+}
+
 describe('ProduitsService', () => {
   let service: ProduitsService;
   let produitsRepo: any;
   let boutiquesService: any;
+  let dataSource: { transaction: jest.Mock };
 
   beforeEach(async () => {
     produitsRepo = {
@@ -19,12 +33,14 @@ describe('ProduitsService', () => {
       remove: jest.fn(),
     };
     boutiquesService = { findOne: jest.fn() };
+    dataSource = { transaction: jest.fn() };
 
     const module = await Test.createTestingModule({
       providers: [
         ProduitsService,
         { provide: getRepositoryToken(Produit), useValue: produitsRepo },
         { provide: BoutiquesService, useValue: boutiquesService },
+        { provide: DataSource, useValue: dataSource },
       ],
     }).compile();
 
@@ -68,6 +84,44 @@ describe('ProduitsService', () => {
       boutiquesService.findOne.mockResolvedValue({ id: 'b1', commercant_id: 'commercant-1' });
       const result = await service.update('p1', { prix: 999 } as any, 'admin-1', UserRole.ADMINISTRATEUR);
       expect(result.prix).toBe(999);
+    });
+  });
+
+  describe('reserverStock', () => {
+    it('décrémente le stock sous verrou transactionnel', async () => {
+      const manager = fakeManager({ id: 'p1', nom: 'Pain', quantiteStock: 10 });
+      dataSource.transaction.mockImplementation((cb) => cb(manager));
+
+      const result = await service.reserverStock('p1', 3);
+      expect(result.quantiteStock).toBe(7);
+    });
+
+    it('refuse si le stock est insuffisant', async () => {
+      const manager = fakeManager({ id: 'p1', nom: 'Pain', quantiteStock: 2 });
+      dataSource.transaction.mockImplementation((cb) => cb(manager));
+      await expect(service.reserverStock('p1', 3)).rejects.toThrow(BadRequestException);
+    });
+
+    it('échoue si le produit est introuvable', async () => {
+      const manager = fakeManager(null);
+      dataSource.transaction.mockImplementation((cb) => cb(manager));
+      await expect(service.reserverStock('inconnu', 1)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('libererStock', () => {
+    it('restaure le stock du produit', async () => {
+      const manager = fakeManager({ id: 'p1', nom: 'Pain', quantiteStock: 5 });
+      dataSource.transaction.mockImplementation((cb) => cb(manager));
+      await service.libererStock('p1', 2);
+      expect(manager.save).toHaveBeenCalledWith(expect.objectContaining({ quantiteStock: 7 }));
+    });
+
+    it('ne fait rien si le produit a été supprimé depuis', async () => {
+      const manager = fakeManager(null);
+      dataSource.transaction.mockImplementation((cb) => cb(manager));
+      await expect(service.libererStock('inconnu', 2)).resolves.toBeUndefined();
+      expect(manager.save).not.toHaveBeenCalled();
     });
   });
 });

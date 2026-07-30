@@ -36,11 +36,20 @@ async function bootstrap() {
 
   async function getOrCreateBoutique(
     commercant: User,
-    dto: { nom: string; categorie: BoutiqueCategorie; adresse: string },
+    dto: { nom: string; categorie: BoutiqueCategorie; adresse: string; latitude: number; longitude: number },
   ): Promise<Boutique> {
     const existantes = await boutiquesService.findByCommercant(commercant.id);
     const trouvee = existantes.find((b) => b.nom === dto.nom);
-    if (trouvee) return trouvee;
+    if (trouvee) {
+      // Complète les coordonnées d'une boutique de démo créée avant leur ajout au seed —
+      // sans elles, le tri par proximité (§1.2) n'a aucune donnée à exploiter.
+      if (trouvee.latitude == null || trouvee.longitude == null) {
+        return boutiquesService.update(
+          trouvee.id, { latitude: dto.latitude, longitude: dto.longitude }, commercant.id, UserRole.COMMERCANT,
+        );
+      }
+      return trouvee;
+    }
     return boutiquesService.create(dto, commercant.id);
   }
 
@@ -127,14 +136,17 @@ async function bootstrap() {
   const boulangerie = await getOrCreateBoutique(commercant1, {
     nom: 'Boulangerie du Coin', categorie: BoutiqueCategorie.BOULANGERIE,
     adresse: '12 Avenue Cheikh Anta Diop, Dakar',
+    latitude: 14.6928, longitude: -17.4636,
   });
   const epicerie = await getOrCreateBoutique(commercant2, {
     nom: 'Épicerie Fraîcheur', categorie: BoutiqueCategorie.EPICERIE,
     adresse: '45 Rue Félix Faure, Dakar',
+    latitude: 14.6708, longitude: -17.4316,
   });
   const friperie = await getOrCreateBoutique(commercant3, {
     nom: 'Friperie Rétro', categorie: BoutiqueCategorie.FRIPERIE,
     adresse: '8 Rue Vincens, Dakar',
+    latitude: 14.6743, longitude: -17.4295,
   });
 
   console.log('Création des produits...');

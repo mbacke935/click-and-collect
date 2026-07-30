@@ -24,7 +24,13 @@
     "plugins": [
       "expo-secure-store",
       "expo-sqlite",
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Utilisée pour trier les commerces les plus proches de vous."
+        }
+      ]
     ]
   }
 }

@@ -2,9 +2,11 @@ import React, { useEffect, useState } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet, ActivityIndicator,
 } from 'react-native';
+import * as Location from 'expo-location';
 import { COLORS } from '../../constants/theme';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { distanceKm, formatDistance, type Coordonnees } from '../../utils/geo';
 
 const CATEGORIES = ['Toutes', 'boulangerie', 'epicerie', 'friperie'];
 
@@ -14,16 +16,50 @@ export default function BoutiqueListScreen({ navigation }: any) {
   const [filtre, setFiltre] = useState('Toutes');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [position, setPosition] = useState<Coordonnees | null>(null);
+  const [localisationRefusee, setLocalisationRefusee] = useState(false);
 
   useEffect(() => {
     api.get('/boutiques').then(({ data }) => { setBoutiques(data); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
 
-  const filtered = boutiques.filter((b) => {
-    if (filtre !== 'Toutes' && b.categorie !== filtre) return false;
-    if (search && !b.nom.toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
+  // Position du client pour trier les commerces par proximité (§1.2 « commerçants de leur
+  // zone géographique ») — best-effort : sans permission ou hors-ligne, la liste retombe
+  // simplement sur l'ordre par défaut de l'API (alphabétique).
+  useEffect(() => {
+    (async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') { setLocalisationRefusee(true); return; }
+        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        setPosition({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+      } catch {
+        setLocalisationRefusee(true);
+      }
+    })();
+  }, []);
+
+  const avecDistance = boutiques
+    .filter((b) => {
+      if (filtre !== 'Toutes' && b.categorie !== filtre) return false;
+      if (search && !b.nom.toLowerCase().includes(search.toLowerCase())) return false;
+      return true;
+    })
+    .map((b) => ({
+      ...b,
+      distanceKm: (position && b.latitude != null && b.longitude != null)
+        ? distanceKm(position, { latitude: b.latitude, longitude: b.longitude })
+        : null,
+    }));
+
+  // Boutiques les plus proches d'abord ; celles sans coordonnées (ou sans position
+  // connue) restent en fin de liste plutôt que d'être masquées.
+  const filtered = [...avecDistance].sort((a, b) => {
+    if (a.distanceKm == null && b.distanceKm == null) return 0;
+    if (a.distanceKm == null) return 1;
+    if (b.distanceKm == null) return -1;
+    return a.distanceKm - b.distanceKm;
   });
 
   if (loading) return <View style={styles.center}><ActivityIndicator color={COLORS.gold} size="large" /></View>;
@@ -41,6 +77,11 @@ export default function BoutiqueListScreen({ navigation }: any) {
           </TouchableOpacity>
         </View>
       </View>
+      {localisationRefusee && (
+        <Text style={styles.locationHint}>
+          Activez la localisation pour trier les boutiques les plus proches en premier.
+        </Text>
+      )}
       <TextInput
         style={styles.search}
         placeholder="Rechercher une boutique..."
@@ -75,7 +116,10 @@ export default function BoutiqueListScreen({ navigation }: any) {
                 <Text style={styles.badgeText}>Ouvert</Text>
               </View>
             </View>
-            <Text style={styles.cardSub}>{item.adresse}</Text>
+            <Text style={styles.cardSub}>
+              {item.adresse}
+              {item.distanceKm != null ? ` · ${formatDistance(item.distanceKm)}` : ''}
+            </Text>
           </TouchableOpacity>
         )}
         ListEmptyComponent={<Text style={styles.empty}>Aucune boutique trouvée.</Text>}
@@ -92,6 +136,7 @@ const styles = StyleSheet.create({
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   headerLink: { color: COLORS.gold, fontSize: 13, fontWeight: '600' },
   logout: { color: COLORS.muted, fontSize: 13, fontWeight: '600' },
+  locationHint: { color: COLORS.mutedLight, fontSize: 11, marginBottom: 10 },
   search: { borderBottomWidth: 1, borderColor: COLORS.mutedLight, color: COLORS.white, fontSize: 14, paddingVertical: 10, marginBottom: 16 },
   chips: { flexDirection: 'row', gap: 8, marginBottom: 18 },
   chip: { borderWidth: 1, borderColor: COLORS.mutedLight, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7 },

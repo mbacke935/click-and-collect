@@ -1,5 +1,5 @@
 import { Test } from '@nestjs/testing';
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import { CommandesService } from './commandes.service';
@@ -123,6 +123,17 @@ describe('CommandesService', () => {
 
       expect(billet.dateRetrait).toBeInstanceOf(Date);
       expect(billetsRepo.save).toHaveBeenCalledWith(billet);
+    });
+
+    it('refuse de revalider un billet déjà retiré (anti-rejeu, ex. depuis un autre appareil)', async () => {
+      const billet = { dateRetrait: new Date('2026-01-01T10:00:00Z') };
+      commandesRepo.findOne.mockResolvedValue({ id: 'cmd1', boutique_id: 'b1', statut: CommandeStatut.RECUPEREE, billet });
+      boutiquesService.findOne.mockResolvedValue({ id: 'b1', commercant_id: 'moi' });
+
+      await expect(
+        service.updateStatut('cmd1', { statut: CommandeStatut.RECUPEREE }, 'moi', UserRole.COMMERCANT),
+      ).rejects.toThrow(ConflictException);
+      expect(billetsRepo.save).not.toHaveBeenCalled();
     });
 
     it('libère le créneau quand la commande est annulée', async () => {

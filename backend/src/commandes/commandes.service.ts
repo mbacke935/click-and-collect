@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
@@ -162,6 +162,15 @@ export class CommandesService {
     const boutique = await this.boutiquesService.findOne(commande.boutique_id);
     if (boutique.commercant_id !== userId && userRole !== UserRole.ADMINISTRATEUR)
       throw new ForbiddenException('Accès refusé.');
+    // Anti-rejeu (§5.4) : un billet déjà retiré ne doit plus jamais pouvoir être revalidé,
+    // y compris depuis un autre appareil ou un autre événement de synchronisation portant
+    // un clientEventId différent — l'idempotence de SyncService protège du rejeu du même
+    // événement, pas de deux validations distinctes du même billet.
+    if (dto.statut === CommandeStatut.RECUPEREE && commande.billet?.dateRetrait) {
+      throw new ConflictException(
+        `Ce billet a déjà été retiré le ${commande.billet.dateRetrait.toLocaleString('fr-FR')}.`,
+      );
+    }
     commande.statut = dto.statut;
     if (dto.statut === CommandeStatut.RECUPEREE && commande.billet) {
       commande.billet.dateRetrait = new Date();

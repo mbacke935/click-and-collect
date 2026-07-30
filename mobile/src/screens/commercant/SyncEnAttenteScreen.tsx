@@ -27,11 +27,16 @@ export default function SyncEnAttenteScreen() {
 
   const reessayer = async () => {
     setSynchronisation(true);
-    const { synced, remaining } = await flushSyncQueue();
+    const { synced, echecs, remaining } = await flushSyncQueue();
     setSynchronisation(false);
     charger();
-    if (synced === 0 && remaining > 0) {
+    if (synced === 0 && echecs === 0 && remaining > 0) {
       Alert.alert('Toujours hors ligne', 'Aucune connexion disponible — nouvelle tentative au prochain retour sur cet écran.');
+    } else if (echecs > 0) {
+      Alert.alert(
+        'Certains retraits ont été refusés',
+        `${synced} transmis avec succès, ${echecs} refusé${echecs > 1 ? 's' : ''} par le serveur (voir le détail ci-dessous).`,
+      );
     } else if (synced > 0) {
       Alert.alert('Synchronisé', `${synced} retrait${synced > 1 ? 's' : ''} transmis au serveur.`);
     }
@@ -45,13 +50,26 @@ export default function SyncEnAttenteScreen() {
       <FlatList
         data={events}
         keyExtractor={(item) => item.eventId}
-        renderItem={({ item }) => (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Commande N° {item.commande_id.substring(0, 8).toUpperCase()}</Text>
-            <Text style={styles.cardSub}>{ACTION_LABELS[item.action] || item.action}</Text>
-            <Text style={styles.cardDate}>{new Date(item.horodatageLocal).toLocaleString()}</Text>
-          </View>
-        )}
+        renderItem={({ item }) => {
+          const enEchec = item.statut === 'echec';
+          return (
+            <View style={[styles.card, enEchec && styles.cardEchec]}>
+              <View style={styles.cardRow}>
+                <Text style={styles.cardTitle}>Commande N° {item.commande_id.substring(0, 8).toUpperCase()}</Text>
+                {enEchec && (
+                  <View style={styles.badgeEchec}>
+                    <Text style={styles.badgeEchecText}>Refusé</Text>
+                  </View>
+                )}
+              </View>
+              <Text style={styles.cardSub}>{ACTION_LABELS[item.action] || item.action}</Text>
+              <Text style={styles.cardDate}>{new Date(item.horodatageLocal).toLocaleString()}</Text>
+              {enEchec && item.payload?.error && (
+                <Text style={styles.cardErreur}>{item.payload.error}</Text>
+              )}
+            </View>
+          );
+        }}
         contentContainerStyle={{ paddingBottom: 8 }}
         ListEmptyComponent={<Text style={styles.empty}>Aucun événement en attente — tout est synchronisé.</Text>}
       />
@@ -73,9 +91,14 @@ const styles = StyleSheet.create({
   center: { flex: 1, backgroundColor: COLORS.black, justifyContent: 'center', alignItems: 'center' },
   title: { fontSize: 20, fontWeight: '700', color: COLORS.gold, marginBottom: 14 },
   card: { backgroundColor: COLORS.blackCard, borderWidth: 1, borderColor: COLORS.line, borderRadius: 6, padding: 14, marginBottom: 10 },
+  cardEchec: { borderColor: COLORS.red },
+  cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   cardTitle: { color: COLORS.white, fontSize: 14, fontWeight: '600', fontFamily: 'monospace' },
   cardSub: { color: COLORS.gold, fontSize: 13, marginTop: 4 },
   cardDate: { color: COLORS.muted, fontSize: 12, marginTop: 2 },
+  cardErreur: { color: COLORS.red, fontSize: 12, marginTop: 6 },
+  badgeEchec: { backgroundColor: 'rgba(239,68,68,0.12)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 3 },
+  badgeEchecText: { color: COLORS.red, fontSize: 10, fontWeight: '700', textTransform: 'uppercase' },
   empty: { color: COLORS.muted, textAlign: 'center', marginTop: 40 },
   btn: { backgroundColor: COLORS.gold, paddingVertical: 14, borderRadius: 6, alignItems: 'center', marginTop: 10 },
   btnText: { color: COLORS.black, fontWeight: '700', fontSize: 15 },

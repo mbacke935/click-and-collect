@@ -9,7 +9,20 @@ export interface SyncQueueItem {
   billet_id: string | null;
   payload: Record<string, any>;
   horodatageLocal: string;
-  statut: 'en_attente' | 'synced';
+  statut: 'en_attente' | 'synced' | 'echec';
+}
+
+export interface ResultatSync {
+  eventId: string;
+  statut: 'synced' | 'echec';
+  erreur?: string;
+}
+
+export interface FlushResult {
+  synced: number;
+  echecs: number;
+  remaining: number;
+  resultats: ResultatSync[];
 }
 
 // Empile un événement (ex. retrait validé hors-ligne) dans la file locale SQLite, avec un
@@ -48,13 +61,17 @@ export async function countPendingEvents(): Promise<number> {
   return row?.n ?? 0;
 }
 
-// Tente d'envoyer tous les événements en attente au serveur en un seul batch (endpoint
-// idempotent POST /sync). Approche best-effort : si l'appel réseau échoue (pas de
-// connexion), les événements restent en file pour une prochaine tentative — aucune
-// exception n'est propagée à l'appelant.
-export async function flushSyncQueue(): Promise<{ synced: number; remaining: number }> {
+// Tente d'envoyer tous les événements en attente (ou déjà en échec, pour une nouvelle
+// tentative) au serveur en un seul batch (endpoint idempotent POST /sync). Le serveur traite
+// chaque événement indépendamment (voir SyncService.processBatch) : la requête HTTP peut
+// réussir globalement (200) tout en contenant des événements individuellement rejetés (ex.
+// billet déjà retiré par un autre appareil — anti-rejeu §5.4). On ne marque donc "synced"
+// localement que les événements que le serveur a lui-même confirmés ; les événements
+// rejetés passent à "echec" (avec le message d'erreur conservé pour affichage) plutôt que
+// d'être traités comme un succès.
+export async function flushSyncQueue(): Promise<FlushResult> {
   const pending = await getPendingEvents();
-  if (pending.length === 0) return { synced: 0, remaining: 0 };
+  if (pending.length === 0) return { synced: 0, echecs: 0, remaining: 0, resultats: [] };
 
   try {
     const events = pending.map((e) => ({
@@ -65,14 +82,31 @@ export async function flushSyncQueue(): Promise<{ synced: number; remaining: num
       payload: e.payload,
       horodatageLocal: e.horodatageLocal,
     }));
-    await api.post('/sync', { events });
+    const { data } = await api.post('/sync', { events });
+    const reponses: any[] = Array.isArray(data) ? data : [];
 
     const db = await getDb();
+    const resultats: ResultatSync[] = [];
     for (const e of pending) {
-      await db.runAsync("UPDATE sync_queue SET statut = 'synced' WHERE eventId = ?", e.eventId);
+      const reponse = reponses.find((r) => r.clientEventId === e.eventId);
+      if (reponse?.statut === 'synced') {
+        await db.runAsync("UPDATE sync_queue SET statut = 'synced' WHERE eventId = ?", e.eventId);
+        resultats.push({ eventId: e.eventId, statut: 'synced' });
+      } else if (reponse?.statut === 'failed') {
+        const erreur: string = reponse.payload?.error || 'Échec de synchronisation.';
+        await db.runAsync(
+          "UPDATE sync_queue SET statut = 'echec', payload = ? WHERE eventId = ?",
+          JSON.stringify({ ...e.payload, error: erreur }), e.eventId,
+        );
+        resultats.push({ eventId: e.eventId, statut: 'echec', erreur });
+      }
+      // Pas de réponse pour cet événement (incohérence inattendue côté serveur) : on le
+      // laisse tel quel, il sera simplement réessayé au prochain flush.
     }
-    return { synced: pending.length, remaining: 0 };
+    const synced = resultats.filter((r) => r.statut === 'synced').length;
+    const echecs = resultats.filter((r) => r.statut === 'echec').length;
+    return { synced, echecs, remaining: pending.length - synced - echecs, resultats };
   } catch {
-    return { synced: 0, remaining: pending.length };
+    return { synced: 0, echecs: 0, remaining: pending.length, resultats: [] };
   }
 }

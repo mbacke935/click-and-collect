@@ -14,6 +14,10 @@ jest.mock('../src/storage/database', () => ({
         const [eventId] = params;
         const row = mockRows.find((r) => r.eventId === eventId);
         if (row) row.statut = 'synced';
+      } else if (sql.includes("UPDATE sync_queue SET statut = 'echec'")) {
+        const [payload, eventId] = params;
+        const row = mockRows.find((r) => r.eventId === eventId);
+        if (row) { row.statut = 'echec'; row.payload = payload; }
       }
     }),
     getAllAsync: jest.fn(async (sql: string) => {
@@ -67,17 +71,20 @@ describe('syncService — file de synchronisation locale', () => {
   describe('flushSyncQueue', () => {
     it('ne fait rien et ne renvoie aucune erreur quand la file est vide', async () => {
       const result = await flushSyncQueue();
-      expect(result).toEqual({ synced: 0, remaining: 0 });
+      expect(result).toEqual({ synced: 0, echecs: 0, remaining: 0, resultats: [] });
       expect(mockApiPost).not.toHaveBeenCalled();
     });
 
-    it('marque les événements comme synchronisés après un envoi réussi au serveur', async () => {
-      await enqueueEvent('retrait_valide', 'cmd1', 'billet1', { statut: 'recuperee' });
-      mockApiPost.mockResolvedValue({ data: [] });
+    it('ne marque "synced" que les événements confirmés individuellement par le serveur', async () => {
+      const eventId = await enqueueEvent('retrait_valide', 'cmd1', 'billet1', { statut: 'recuperee' });
+      mockApiPost.mockResolvedValue({ data: [{ clientEventId: eventId, statut: 'synced' }] });
 
       const result = await flushSyncQueue();
 
-      expect(result).toEqual({ synced: 1, remaining: 0 });
+      expect(result).toEqual({
+        synced: 1, echecs: 0, remaining: 0,
+        resultats: [{ eventId, statut: 'synced' }],
+      });
       expect(mockApiPost).toHaveBeenCalledWith('/sync', {
         events: [expect.objectContaining({ action: 'retrait_valide', commande_id: 'cmd1' })],
       });
@@ -90,8 +97,28 @@ describe('syncService — file de synchronisation locale', () => {
 
       const result = await flushSyncQueue();
 
-      expect(result).toEqual({ synced: 0, remaining: 1 });
+      expect(result).toEqual({ synced: 0, echecs: 0, remaining: 1, resultats: [] });
       expect(await countPendingEvents()).toBe(1);
+    });
+
+    it("ne traite pas comme un succès un événement rejeté par le serveur (ex. billet déjà retiré)", async () => {
+      const eventId = await enqueueEvent('retrait_valide', 'cmd1', 'billet1', { statut: 'recuperee' });
+      mockApiPost.mockResolvedValue({
+        data: [{ clientEventId: eventId, statut: 'failed', payload: { error: 'Ce billet a déjà été retiré.' } }],
+      });
+
+      const result = await flushSyncQueue();
+
+      expect(result).toEqual({
+        synced: 0, echecs: 1, remaining: 0,
+        resultats: [{ eventId, statut: 'echec', erreur: 'Ce billet a déjà été retiré.' }],
+      });
+      // Toujours compté comme "à traiter" localement (ni synchronisé, ni oublié) —
+      // consultable dans SyncEnAttenteScreen avec le message d'erreur.
+      expect(await countPendingEvents()).toBe(1);
+      const [pending] = await getPendingEvents();
+      expect(pending.statut).toBe('echec');
+      expect(pending.payload.error).toBe('Ce billet a déjà été retiré.');
     });
   });
 });

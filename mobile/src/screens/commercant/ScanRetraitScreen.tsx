@@ -40,9 +40,20 @@ export default function ScanRetraitScreen({ route, navigation }: any) {
       return;
     }
 
-    await enqueueEvent('retrait_valide', commande.id, commande.billet?.id, { statut: 'recuperee' });
-    const { remaining } = await flushSyncQueue();
-    setEnAttenteSync(remaining > 0);
+    const eventId = await enqueueEvent('retrait_valide', commande.id, commande.billet?.id, { statut: 'recuperee' });
+    const { resultats } = await flushSyncQueue();
+    const resultat = resultats.find((r) => r.eventId === eventId);
+
+    // Le serveur a explicitement rejeté ce retrait (ex. billet déjà retiré depuis un autre
+    // appareil, §5.4 anti-rejeu) : il ne faut surtout pas afficher l'écran de succès.
+    if (resultat?.statut === 'echec') {
+      Alert.alert('Retrait refusé', resultat.erreur || 'Ce retrait ne peut pas être validé.');
+      setScanned(false);
+      return;
+    }
+
+    // Pas de résultat renvoyé : appareil hors-ligne, l'événement reste en attente locale.
+    setEnAttenteSync(!resultat);
     setDone(true);
   };
 

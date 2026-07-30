@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { login } from '../services/api';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '../context/AuthContext';
 import { COLORS, STYLES } from '../constants/theme';
 
 export default function LoginPage() {
@@ -11,6 +11,7 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const { login } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

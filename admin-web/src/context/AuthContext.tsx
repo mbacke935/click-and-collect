@@ -1,17 +1,18 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { getValidSession, logout as doLogout, AdminSession } from '../services/api';
+import { getValidSession, login as apiLogin, logout as doLogout, AdminSession } from '../services/api';
 
 interface AuthState {
   loading: boolean;
   isAuthenticated: boolean;
   session: AdminSession | null;
+  login: (email: string, password: string) => Promise<void>;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthState>({
-  loading: true, isAuthenticated: false, session: null, logout: () => {},
+  loading: true, isAuthenticated: false, session: null, login: async () => {}, logout: () => {},
 });
 
 // Fournit l'état d'authentification réel du back-office (jeton présent, non expiré,
@@ -27,13 +28,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(false);
   }, []);
 
+  // AuthProvider vit dans le layout racine et ne remonte donc jamais lors d'une navigation
+  // client (router.push) : sans repasser par ce login() pour mettre à jour `session`
+  // directement, LoginPage.handleSubmit() posait le jeton en localStorage puis naviguait
+  // vers "/", mais isAuthenticated restait faux jusqu'au prochain rechargement complet de
+  // page — AdminLayout affichait alors une page blanche au lieu du tableau de bord.
+  const login = async (email: string, password: string) => {
+    await apiLogin(email, password);
+    setSession(getValidSession());
+  };
+
   const logout = () => {
     setSession(null);
     doLogout();
   };
 
   return (
-    <AuthContext.Provider value={{ loading, isAuthenticated: !!session, session, logout }}>
+    <AuthContext.Provider value={{ loading, isAuthenticated: !!session, session, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

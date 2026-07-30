@@ -33,9 +33,12 @@ export async function apiFetch<T = unknown>(path: string, options: RequestInit =
     const err = await res.json().catch(() => ({}));
     throw new Error(err.message || `Erreur ${res.status}`);
   }
-  // 204 No Content (ex. DELETE) : pas de corps à désérialiser.
-  if (res.status === 204) return undefined as T;
-  return res.json();
+  // Pas de corps à désérialiser : le cas explicite 204 No Content, mais aussi certaines
+  // routes qui répondent 200 avec un corps vide (ex. DELETE /admin/users/:id, dont le
+  // contrôleur ne renvoie rien) — res.json() lève sinon "Unexpected end of JSON input"
+  // et empêche l'appelant de savoir que la requête a pourtant réussi côté serveur.
+  const texte = await res.text();
+  return texte ? JSON.parse(texte) : (undefined as T);
 }
 
 export async function login(email: string, password: string) {

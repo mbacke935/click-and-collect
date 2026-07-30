@@ -26,7 +26,7 @@ export const FONTS = {
   monoGold: { fontSize: 14, fontFamily: 'monospace', color: COLORS.gold },
 };
 
-export const API_URL = 'http://192.168.1.23:3001'; // à adapter selon votre réseau
+export const API_URL = 'http://192.168.1.25:3001'; // à adapter selon votre réseau
 
 // Secret pré-partagé permettant à l'application Commerçant de déchiffrer et valider
 // un billet de retrait localement, sans appel réseau (dossier de spécifications §5.3.c :

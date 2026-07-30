@@ -2,7 +2,10 @@ import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import { API_URL } from '../constants/theme';
 
-const api = axios.create({ baseURL: API_URL });
+// Timeout explicite : sans lui, une requête vers une API_URL injoignable (ex. adresse IP
+// locale qui a changé — voir constants/theme.ts) reste en attente indéfiniment, laissant
+// croire à un problème de lenteur de l'application plutôt qu'à un problème réseau.
+const api = axios.create({ baseURL: API_URL, timeout: 10000 });
 
 // Injecte le token JWT dans chaque requête si disponible
 api.interceptors.request.use(async (config) => {

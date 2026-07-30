@@ -4,13 +4,18 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { COLORS } from '../../constants/theme';
 import { decryptBilletPayload } from '../../crypto/qrCipher';
 import { enqueueEvent, flushSyncQueue } from '../../services/syncService';
+import { billetCode, normaliserCodeSaisi } from '../../utils/billetCode';
 
-// Valide un billet de retrait entièrement hors-ligne : le QR scanné (ou le code saisi)
-// contient le qrCodePayload chiffré généré par le serveur à la commande. On le déchiffre
-// localement (clé pré-partagée embarquée, voir crypto/qrCipher.ts) et on vérifie qu'il
-// correspond bien à la commande affichée, sans aucun appel réseau — cf. dossier de
-// spécifications §3.5 et §5.3.c. Le retrait est ensuite empilé dans la file de
-// synchronisation locale et transmis dès que le réseau revient (§3.5 étapes 4-5).
+// Valide un billet de retrait entièrement hors-ligne, par deux moyens équivalents :
+// - le QR scanné contient le qrCodePayload chiffré généré par le serveur à la commande ;
+// - à défaut (caméra indisponible, QR abîmé), le commerçant saisit le code court affiché
+//   sur le billet du client (voir utils/billetCode.ts) ; une fois ce code vérifié, on
+//   rejoue le même contrôle d'intégrité sur le qrCodePayload déjà connu de la commande.
+// Dans les deux cas, on déchiffre localement (clé pré-partagée embarquée, voir
+// crypto/qrCipher.ts) et on vérifie que le billet correspond bien à la commande affichée,
+// sans aucun appel réseau — cf. dossier de spécifications §3.5 et §5.3.c. Le retrait est
+// ensuite empilé dans la file de synchronisation locale et transmis dès que le réseau
+// revient (§3.5 étapes 4-5).
 export default function ScanRetraitScreen({ route, navigation }: any) {
   const { commande } = route.params;
   const [permission, requestPermission] = useCameraPermissions();
@@ -46,8 +51,12 @@ export default function ScanRetraitScreen({ route, navigation }: any) {
       Alert.alert('Erreur', 'Aucun billet associé à cette commande.');
       return;
     }
-    // La saisie manuelle rejoue simplement le contrôle d'intégrité local sur le billet
-    // déjà connu de la commande (le code affiché au client sert de confirmation visuelle).
+    if (normaliserCodeSaisi(code) !== billetCode(commande.id)) {
+      Alert.alert('Code incorrect', "Ce code ne correspond pas au billet de cette commande.");
+      return;
+    }
+    // Le code saisi correspond à celui affiché sur le billet du client : on rejoue le
+    // contrôle d'intégrité local sur le qrCodePayload déjà connu de la commande.
     validerBillet(commande.billet.qrCodePayload);
   };
 

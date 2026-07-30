@@ -5,6 +5,7 @@ import StatusBadge from '../../components/StatusBadge';
 import QRCodeDisplay from '../../components/QRCodeDisplay';
 import { connectSocket } from '../../services/socketService';
 import { saveCommande } from '../../services/offlineDb';
+import { billetCode } from '../../utils/billetCode';
 
 const STEPS = ['recue', 'en_preparation', 'prete', 'recuperee'];
 const STEP_LABELS = ['Reçue', 'En préparation', 'Prête', 'Récupérée'];
@@ -64,7 +65,7 @@ export default function CommandeStatutScreen({ route }: any) {
           value={commande.billet.qrCodePayload}
           boutique={commande.boutiqueNom || commande.boutique_id.substring(0, 8)}
           creneau={commande.creneau ? `${commande.creneau.jour} · ${commande.creneau.heureDebut}–${commande.creneau.heureFin}` : ''}
-          code={`N° ${commande.id.substring(0, 4).toUpperCase()}`}
+          code={`N° ${billetCode(commande.id)}`}
         />
       )}
 

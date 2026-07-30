@@ -8,6 +8,7 @@ import StatusBadge from '../../components/StatusBadge';
 import { useAuth } from '../../context/AuthContext';
 import { connectSocket } from '../../services/socketService';
 import { flushSyncQueue } from '../../services/syncService';
+import { saveCommandes, getCommandesHorsLigneParBoutique, setCache, getCache } from '../../services/offlineDb';
 
 const FILTRES = ['recue', 'en_preparation', 'prete', 'recuperee'];
 const FILTRE_LABELS: Record<string, string> = {
@@ -20,6 +21,12 @@ export default function DashboardScreen({ navigation }: any) {
   const [commandes, setCommandes] = useState<any[]>([]);
   const [filtre, setFiltre] = useState('recue');
   const [loading, setLoading] = useState(true);
+  const [horsLigne, setHorsLigne] = useState(false);
+
+  // Clé du cache local (chiffré) où l'on garde la liste des boutiques du commerçant :
+  // sans réseau, /boutiques/me/boutiques est injoignable, mais il faut quand même savoir
+  // quelle boutique consulter pour filtrer le cache des commandes (voir offlineDb.ts).
+  const CACHE_BOUTIQUES = 'mesBoutiques';
 
   useEffect(() => {
     // Tentative opportuniste de rattrapage : si des retraits ont été validés hors-ligne
@@ -27,14 +34,31 @@ export default function DashboardScreen({ navigation }: any) {
     // est ouvert avec une connexion disponible.
     flushSyncQueue();
     (async () => {
+      let bList: any[] = [];
+      let boutiquesHorsLigne = false;
       try {
-        const { data: bList } = await api.get('/boutiques/me/boutiques');
-        setBoutiques(bList);
-        if (bList.length > 0) {
+        const res = await api.get('/boutiques/me/boutiques');
+        bList = res.data;
+        await setCache(CACHE_BOUTIQUES, bList);
+      } catch {
+        bList = (await getCache<any[]>(CACHE_BOUTIQUES)) || [];
+        boutiquesHorsLigne = true;
+      }
+      setBoutiques(bList);
+
+      if (bList.length > 0) {
+        try {
           const { data: cList } = await api.get(`/commandes/boutique/${bList[0].id}`);
           setCommandes(cList);
+          setHorsLigne(boutiquesHorsLigne);
+          await saveCommandes(cList);
+        } catch {
+          setCommandes(await getCommandesHorsLigneParBoutique(bList[0].id));
+          setHorsLigne(true);
         }
-      } catch {}
+      } else {
+        setHorsLigne(boutiquesHorsLigne);
+      }
       setLoading(false);
     })();
   }, []);
@@ -73,6 +97,11 @@ export default function DashboardScreen({ navigation }: any) {
           <Text style={styles.logout}>Déconnexion</Text>
         </TouchableOpacity>
       </View>
+      {horsLigne && (
+        <View style={styles.offlineBadge}>
+          <Text style={styles.offlineText}>Hors ligne — dernières commandes connues</Text>
+        </View>
+      )}
       <View style={styles.manageRow}>
         <TouchableOpacity
           style={styles.manageChip}
@@ -132,6 +161,8 @@ const styles = StyleSheet.create({
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   title: { fontSize: 20, fontWeight: '700', color: COLORS.gold },
   logout: { color: COLORS.muted, fontSize: 13, fontWeight: '600' },
+  offlineBadge: { backgroundColor: COLORS.blackLighter, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 4, marginBottom: 14 },
+  offlineText: { color: COLORS.muted, fontSize: 12, textAlign: 'center' },
   manageRow: { flexDirection: 'row', gap: 8, marginBottom: 14 },
   manageChip: { flex: 1, borderWidth: 1, borderColor: COLORS.goldDark, borderRadius: 6, paddingVertical: 10, alignItems: 'center' },
   manageChipText: { color: COLORS.gold, fontSize: 12, fontWeight: '600' },

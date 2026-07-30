@@ -27,3 +27,26 @@ export async function getCommandesHorsLigne(): Promise<any[]> {
   const commandes = await Promise.all(rows.map((r) => decryptFromLocalCache(r.data)));
   return commandes;
 }
+
+// Sous-ensemble du cache pour une boutique donnée — utilisé côté commerçant pour
+// consulter (et scanner) les commandes de sa boutique hors-ligne (voir DashboardScreen).
+export async function getCommandesHorsLigneParBoutique(boutiqueId: string): Promise<any[]> {
+  const commandes = await getCommandesHorsLigne();
+  return commandes.filter((c) => c.boutique_id === boutiqueId);
+}
+
+// Cache clé/valeur générique (chiffré comme le reste) pour de petites données annexes
+// qu'il faut retrouver hors-ligne — ex. la liste des boutiques du commerçant connecté,
+// nécessaire pour savoir quelles commandes filtrer quand l'API est injoignable.
+export async function setCache(key: string, data: unknown): Promise<void> {
+  const db = await getDb();
+  const encrypted = await encryptForLocalCache(data);
+  await db.runAsync('INSERT OR REPLACE INTO kv_cache (key, value) VALUES (?, ?)', key, encrypted);
+}
+
+export async function getCache<T = any>(key: string): Promise<T | null> {
+  const db = await getDb();
+  const row = await db.getFirstAsync<{ value: string }>('SELECT value FROM kv_cache WHERE key = ?', key);
+  if (!row) return null;
+  return decryptFromLocalCache<T>(row.value);
+}

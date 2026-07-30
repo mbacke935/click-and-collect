@@ -1,10 +1,13 @@
 import * as SQLite from 'expo-sqlite';
 
 // Base locale unique (expo-sqlite) partagée par le cache de consultation hors-ligne
-// (commandes_cache) et la file de synchronisation des retraits commerçant (sync_queue).
-// SQLCipher n'étant pas compatible avec Expo Go, la confidentialité des données
-// sensibles est assurée en amont par chiffrement applicatif (voir crypto/qrCipher.ts)
-// plutôt que par le chiffrement natif de la base — cf. dossier de spécifications §1.4/5.3.
+// (commandes_cache), la file de synchronisation des retraits commerçant (sync_queue) et
+// un cache générique clé/valeur (kv_cache — ex. la liste des boutiques du commerçant,
+// nécessaire pour retrouver la bonne boutique quand /boutiques/me/boutiques est
+// injoignable). SQLCipher n'étant pas compatible avec Expo Go, la confidentialité des
+// données sensibles est assurée en amont par chiffrement applicatif (voir
+// crypto/qrCipher.ts) plutôt que par le chiffrement natif de la base — cf. dossier de
+// spécifications §1.4/5.3.
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
 export function getDb(): Promise<SQLite.SQLiteDatabase> {
@@ -25,6 +28,10 @@ export function getDb(): Promise<SQLite.SQLiteDatabase> {
           payload TEXT NOT NULL,
           horodatageLocal TEXT NOT NULL,
           statut TEXT NOT NULL DEFAULT 'en_attente'
+        );
+        CREATE TABLE IF NOT EXISTS kv_cache (
+          key TEXT PRIMARY KEY NOT NULL,
+          value TEXT NOT NULL
         );
       `);
       return db;

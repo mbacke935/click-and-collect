@@ -13,6 +13,9 @@ backend/coverage/
 # Admin web (Next.js)
 admin-web/.next/
 admin-web/out/
+admin-web/test-results/
+admin-web/playwright-report/
+admin-web/blob-report/
 
 # Mobile (Expo)
 mobile/.expo/

@@ -36,16 +36,23 @@ async function bootstrap() {
 
   async function getOrCreateBoutique(
     commercant: User,
-    dto: { nom: string; categorie: BoutiqueCategorie; adresse: string; latitude: number; longitude: number },
+    dto: {
+      nom: string; categorie: BoutiqueCategorie; adresse: string; latitude: number; longitude: number;
+      horaires: Record<string, { ouvert: string; ferme: string }>;
+    },
   ): Promise<Boutique> {
     const existantes = await boutiquesService.findByCommercant(commercant.id);
     const trouvee = existantes.find((b) => b.nom === dto.nom);
     if (trouvee) {
-      // Complète les coordonnées d'une boutique de démo créée avant leur ajout au seed —
-      // sans elles, le tri par proximité (§1.2) n'a aucune donnée à exploiter.
-      if (trouvee.latitude == null || trouvee.longitude == null) {
+      // Complète les coordonnées et horaires d'une boutique de démo créée avant leur ajout
+      // au seed — sans elles, le tri par proximité (§1.2) et l'affichage des horaires de la
+      // vitrine (§Module 1) n'ont aucune donnée à exploiter.
+      const manque = trouvee.latitude == null || trouvee.longitude == null || !trouvee.horaires;
+      if (manque) {
         return boutiquesService.update(
-          trouvee.id, { latitude: dto.latitude, longitude: dto.longitude }, commercant.id, UserRole.COMMERCANT,
+          trouvee.id,
+          { latitude: dto.latitude, longitude: dto.longitude, horaires: dto.horaires },
+          commercant.id, UserRole.COMMERCANT,
         );
       }
       return trouvee;
@@ -133,20 +140,37 @@ async function bootstrap() {
   });
 
   console.log('Création des boutiques...');
+  const horairesCommerçants = { // 7h-13h et 15h-20h du lundi au samedi, fermé le dimanche
+    lundi: { ouvert: '07:00', ferme: '20:00' },
+    mardi: { ouvert: '07:00', ferme: '20:00' },
+    mercredi: { ouvert: '07:00', ferme: '20:00' },
+    jeudi: { ouvert: '07:00', ferme: '20:00' },
+    vendredi: { ouvert: '07:00', ferme: '20:00' },
+    samedi: { ouvert: '08:00', ferme: '18:00' },
+  };
   const boulangerie = await getOrCreateBoutique(commercant1, {
     nom: 'Boulangerie du Coin', categorie: BoutiqueCategorie.BOULANGERIE,
     adresse: '12 Avenue Cheikh Anta Diop, Dakar',
     latitude: 14.6928, longitude: -17.4636,
+    horaires: horairesCommerçants,
   });
   const epicerie = await getOrCreateBoutique(commercant2, {
     nom: 'Épicerie Fraîcheur', categorie: BoutiqueCategorie.EPICERIE,
     adresse: '45 Rue Félix Faure, Dakar',
     latitude: 14.6708, longitude: -17.4316,
+    horaires: { ...horairesCommerçants, dimanche: { ouvert: '09:00', ferme: '13:00' } },
   });
   const friperie = await getOrCreateBoutique(commercant3, {
     nom: 'Friperie Rétro', categorie: BoutiqueCategorie.FRIPERIE,
     adresse: '8 Rue Vincens, Dakar',
     latitude: 14.6743, longitude: -17.4295,
+    horaires: {
+      mardi: { ouvert: '10:00', ferme: '19:00' },
+      mercredi: { ouvert: '10:00', ferme: '19:00' },
+      jeudi: { ouvert: '10:00', ferme: '19:00' },
+      vendredi: { ouvert: '10:00', ferme: '19:00' },
+      samedi: { ouvert: '10:00', ferme: '19:00' },
+    },
   });
 
   console.log('Création des produits...');

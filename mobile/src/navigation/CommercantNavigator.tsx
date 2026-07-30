@@ -6,6 +6,7 @@ import CommandesScreen from '../screens/commercant/CommandesScreen';
 import ScanRetraitScreen from '../screens/commercant/ScanRetraitScreen';
 import CatalogueManagerScreen from '../screens/commercant/CatalogueManagerScreen';
 import CreneauxManagerScreen from '../screens/commercant/CreneauxManagerScreen';
+import HorairesManagerScreen from '../screens/commercant/HorairesManagerScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -24,6 +25,7 @@ export default function CommercantNavigator() {
       <Stack.Screen name="ScanRetrait" component={ScanRetraitScreen} options={{ title: 'Scanner' }} />
       <Stack.Screen name="CatalogueManager" component={CatalogueManagerScreen} options={{ title: 'Catalogue' }} />
       <Stack.Screen name="CreneauxManager" component={CreneauxManagerScreen} options={{ title: 'Créneaux' }} />
+      <Stack.Screen name="HorairesManager" component={HorairesManagerScreen} options={{ title: 'Horaires' }} />
     </Stack.Navigator>
   );
 }

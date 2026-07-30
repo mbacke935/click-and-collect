@@ -7,6 +7,7 @@ import { COLORS } from '../../constants/theme';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { distanceKm, formatDistance, type Coordonnees } from '../../utils/geo';
+import { estOuvertMaintenant } from '../../utils/horaires';
 
 const CATEGORIES = ['Toutes', 'boulangerie', 'epicerie', 'friperie'];
 
@@ -105,23 +106,28 @@ export default function BoutiqueListScreen({ navigation }: any) {
       <FlatList
         data={filtered}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.card}
-            onPress={() => navigation.navigate('Catalogue', { boutique: item })}
-          >
-            <View style={styles.cardRow}>
-              <Text style={styles.cardTitle}>{item.nom}</Text>
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>Ouvert</Text>
+        renderItem={({ item }) => {
+          const ouvert = estOuvertMaintenant(item.horaires);
+          return (
+            <TouchableOpacity
+              style={styles.card}
+              onPress={() => navigation.navigate('Catalogue', { boutique: item })}
+            >
+              <View style={styles.cardRow}>
+                <Text style={styles.cardTitle}>{item.nom}</Text>
+                <View style={[styles.badge, !ouvert && styles.badgeFerme]}>
+                  <Text style={[styles.badgeText, !ouvert && styles.badgeTextFerme]}>
+                    {ouvert ? 'Ouvert' : 'Fermé'}
+                  </Text>
+                </View>
               </View>
-            </View>
-            <Text style={styles.cardSub}>
-              {item.adresse}
-              {item.distanceKm != null ? ` · ${formatDistance(item.distanceKm)}` : ''}
-            </Text>
-          </TouchableOpacity>
-        )}
+              <Text style={styles.cardSub}>
+                {item.adresse}
+                {item.distanceKm != null ? ` · ${formatDistance(item.distanceKm)}` : ''}
+              </Text>
+            </TouchableOpacity>
+          );
+        }}
         ListEmptyComponent={<Text style={styles.empty}>Aucune boutique trouvée.</Text>}
       />
     </View>
@@ -148,6 +154,8 @@ const styles = StyleSheet.create({
   cardTitle: { color: COLORS.white, fontSize: 15, fontWeight: '600' },
   cardSub: { color: COLORS.muted, fontSize: 13, marginTop: 4 },
   badge: { backgroundColor: 'rgba(74,222,128,0.12)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 3 },
+  badgeFerme: { backgroundColor: 'rgba(239,68,68,0.12)' },
   badgeText: { color: COLORS.green, fontSize: 10, fontWeight: '700', textTransform: 'uppercase' },
+  badgeTextFerme: { color: COLORS.red },
   empty: { color: COLORS.muted, textAlign: 'center', marginTop: 40 },
 });

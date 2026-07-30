@@ -115,6 +115,12 @@ export default function DashboardScreen({ navigation }: any) {
         >
           <Text style={styles.manageChipText}>Gérer les créneaux</Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.manageChip}
+          onPress={() => navigation.navigate('HorairesManager', { boutiqueId: boutiques[0]?.id })}
+        >
+          <Text style={styles.manageChipText}>Gérer les horaires</Text>
+        </TouchableOpacity>
       </View>
       <View style={styles.chips}>
         {FILTRES.map((f) => {
@@ -163,8 +169,8 @@ const styles = StyleSheet.create({
   logout: { color: COLORS.muted, fontSize: 13, fontWeight: '600' },
   offlineBadge: { backgroundColor: COLORS.blackLighter, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 4, marginBottom: 14 },
   offlineText: { color: COLORS.muted, fontSize: 12, textAlign: 'center' },
-  manageRow: { flexDirection: 'row', gap: 8, marginBottom: 14 },
-  manageChip: { flex: 1, borderWidth: 1, borderColor: COLORS.goldDark, borderRadius: 6, paddingVertical: 10, alignItems: 'center' },
+  manageRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
+  manageChip: { flexGrow: 1, minWidth: '30%', borderWidth: 1, borderColor: COLORS.goldDark, borderRadius: 6, paddingVertical: 10, alignItems: 'center' },
   manageChipText: { color: COLORS.gold, fontSize: 12, fontWeight: '600' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 18 },
   chip: { borderWidth: 1, borderColor: COLORS.mutedLight, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7 },

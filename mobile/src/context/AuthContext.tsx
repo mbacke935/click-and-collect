@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { authService, LoginPayload, RegisterPayload } from '../services/authService';
 import * as SecureStore from 'expo-secure-store';
 import { connectSocket, disconnectSocket } from '../services/socketService';
+import { setSessionExpiredHandler } from '../services/api';
 
 interface AuthContextType {
   isLoggedIn: boolean;
@@ -64,6 +65,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoggedIn(false);
     setUserRole(null);
   };
+
+  // Si le refresh token est expiré (ou le compte suspendu) au moment où l'intercepteur
+  // axios tente de rafraîchir un accessToken expiré, il n'a pas d'autre choix que de
+  // déconnecter l'utilisateur — voir services/api.ts.
+  useEffect(() => {
+    setSessionExpiredHandler(() => { logout(); });
+  }, []);
 
   return (
     <AuthContext.Provider value={{ isLoggedIn, loading, userRole, login, register, logout }}>

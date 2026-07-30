@@ -6,6 +6,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { UsersService } from '../users/users.service';
 import { RegisterDto } from './dto/register.dto';
@@ -24,6 +25,7 @@ export class AuthService {
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -47,7 +49,7 @@ export class AuthService {
       prenom: dto.prenom,
     });
 
-    return this.buildToken(user.id, user.email, user.role);
+    return this.buildTokens(user.id, user.email, user.role);
   }
 
   async login(dto: LoginDto) {
@@ -65,7 +67,7 @@ export class AuthService {
       throw new ForbiddenException('Ce compte a été suspendu par un administrateur.');
     }
 
-    return this.buildToken(user.id, user.email, user.role);
+    return this.buildTokens(user.id, user.email, user.role);
   }
 
   // Changement de mot de passe par le titulaire du compte lui-même : exige l'ancien mot
@@ -90,10 +92,47 @@ export class AuthService {
     await this.usersService.updatePasswordHash(userId, passwordHash);
   }
 
-  private buildToken(userId: string, email: string, role: string) {
+  // Échange un refresh token valide contre une nouvelle paire de jetons (rotation :
+  // l'ancien refresh token n'est plus renvoyé au client). L'utilisateur est rechargé
+  // depuis la base pour refléter un éventuel changement de rôle ou une suspension
+  // décidée entre-temps par un administrateur, plutôt que de faire confiance au payload
+  // du refresh token lui-même.
+  async refresh(refreshToken: string) {
+    let payload: { sub: string };
+    try {
+      payload = this.jwtService.verify(refreshToken, {
+        secret: this.configService.get<string>('jwt.refreshSecret'),
+      });
+    } catch {
+      throw new UnauthorizedException('Session expirée, veuillez vous reconnecter.');
+    }
+
+    const user = await this.usersService.findById(payload.sub);
+    if (!user) {
+      throw new UnauthorizedException('Session expirée, veuillez vous reconnecter.');
+    }
+    if (!user.actif) {
+      throw new ForbiddenException('Ce compte a été suspendu par un administrateur.');
+    }
+
+    return this.buildTokens(user.id, user.email, user.role);
+  }
+
+  private buildTokens(userId: string, email: string, role: string) {
     const payload = { sub: userId, email, role };
-    return {
-      accessToken: this.jwtService.sign(payload),
-    };
+    const accessToken = this.jwtService.sign(payload);
+    // Payload volontairement minimal (juste l'identifiant) : email et rôle sont relus
+    // depuis la base à chaque rafraîchissement (voir refresh() ci-dessus) plutôt que
+    // reportés tels quels d'un jeton à l'autre.
+    const refreshToken = this.jwtService.sign(
+      { sub: userId },
+      {
+        secret: this.configService.get<string>('jwt.refreshSecret'),
+        // Casté : la valeur vient d'une variable d'environnement (chaîne générique), alors
+        // que le typage de jsonwebtoken restreint expiresIn à un littéral de motif "1d"/"30d".
+        expiresIn: this.configService.get<string>('jwt.refreshExpiresIn') as any,
+      },
+    );
+    return { accessToken, refreshToken };
   }
 }

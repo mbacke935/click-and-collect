@@ -1,0 +1,22 @@
+groups:
+  - name: click-and-collect
+    rules:
+      # Cahier des charges Module 4 : alerte si le taux d'échec de validation QR Code
+      # sur le terminal commerçant franchit 3 %, soutenu pendant 5 minutes (évite les
+      # faux positifs sur un pic isolé, ex. un seul scan raté juste après l'ouverture).
+      - alert: QrValidationFailureRateHigh
+        expr: >
+          (
+            sum(rate(qr_validations_total{resultat="echec"}[5m]))
+            /
+            sum(rate(qr_validations_total[5m]))
+          ) > 0.03
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Taux d'échec de validation QR Code élevé"
+          description: >
+            Plus de 3 % des validations de billet QR Code échouent sur les 5 dernières
+            minutes (valeur actuelle : {{ $value | humanizePercentage }}). Vérifier le
+            terminal commerçant et la synchronisation réseau.

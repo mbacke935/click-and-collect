@@ -5,6 +5,7 @@ import { EvenementSync, SyncAction, SyncStatut } from './entities/evenement-sync
 import { SyncEventDto } from './dto/sync-batch.dto';
 import { CommandesService } from '../commandes/commandes.service';
 import { CommandeStatut } from '../commandes/entities/commande.entity';
+import { MetricsService } from '../metrics/metrics.service';
 
 @Injectable()
 export class SyncService {
@@ -13,6 +14,7 @@ export class SyncService {
   constructor(
     @InjectRepository(EvenementSync) private readonly syncRepository: Repository<EvenementSync>,
     private readonly commandesService: CommandesService,
+    private readonly metricsService: MetricsService,
   ) {}
 
   async processBatch(events: SyncEventDto[], userId: string, userRole: string): Promise<EvenementSync[]> {
@@ -43,6 +45,13 @@ export class SyncService {
         this.logger.error(`Échec sync: ${error.message}`);
         record.statut = SyncStatut.FAILED;
         record.payload = { ...record.payload, error: error.message };
+      }
+      // Le retrait validé au scan (RETRAIT_VALIDE) est la seule action qui correspond à une
+      // validation de billet QR Code sur le terminal commerçant — voir §5.4 anti-rejeu.
+      if (evt.action === SyncAction.RETRAIT_VALIDE) {
+        this.metricsService.qrValidationsTotal.inc({
+          resultat: record.statut === SyncStatut.SYNCED ? 'succes' : 'echec',
+        });
       }
       results.push(await this.syncRepository.save(record));
     }

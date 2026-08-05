@@ -153,6 +153,33 @@ Créés par `npm run seed` (mot de passe commun : `password123`) :
 
 **Aucun compte administrateur n'est créé par le seed** (l'inscription publique interdit ce rôle par sécurité). Pour provisionner le premier administrateur, insérer une ligne directement en base ou passer par un accès direct à `UsersService` (voir les tests E2E `backend/test/admin.e2e-spec.ts` pour un exemple de ce bootstrap).
 
+### 3.7 Observabilité (Prometheus & Grafana)
+
+Le backend expose ses métriques au format Prometheus sur `GET /metrics` (voir §4.3). Une stack Prometheus + Grafana, prête à l'emploi, est fournie dans `backend/monitoring/` et déclarée dans `backend/docker-compose.yml` aux côtés de Postgres :
+
+```bash
+cd backend
+npm run start:dev       # le backend doit tourner (PORT=3001, voir .env) : Prometheus le scrape sur l'hôte
+docker compose up -d    # démarre postgres, prometheus et grafana
+```
+
+| Service | URL | Identifiants |
+|---|---|---|
+| Prometheus (cibles, alertes) | http://localhost:9090 | — |
+| Grafana (dashboard « Click & Collect — Observabilité ») | http://localhost:3002 | `admin` / `admin` (dev uniquement, à changer avant tout déploiement) |
+
+Le dashboard et la source de données Prometheus sont **auto-provisionnés** (`backend/monitoring/grafana/provisioning/`) : rien à configurer manuellement dans l'UI Grafana. Il regroupe :
+
+- le débit de commandes (`orders_total`) ;
+- les commandes validées par créneau horaire (`commandes_recuperees_total`) ;
+- la latence de réservation des créneaux (`creneau_reservation_duration_seconds`) ;
+- les validations QR Code au retrait, succès vs échec (`qr_validations_total`) — voir §4.4, le succès/échec est déterminé côté serveur lors du rejeu de l'événement `retrait_valide` via `POST /sync`, pas au déchiffrement local (qui n'atteint jamais le backend) ;
+- le taux d'erreur de l'API de mise à jour des inventaires (`http_requests_total` sur `PATCH /boutiques/:boutiqueId/produits/:id`).
+
+Une règle d'alerte Prometheus (`backend/monitoring/alert-rules.yml`) se déclenche si le taux d'échec de validation QR Code dépasse 3 % pendant 5 minutes — visible dans Prometheus sous `/alerts`.
+
+**Note Docker/Linux** : le backend n'étant pas conteneurisé, Prometheus l'atteint via `host.docker.internal` (résolu grâce à `extra_hosts: host-gateway` dans `docker-compose.yml`, disponible depuis Docker Engine 20.10). Si Prometheus affiche la cible comme `DOWN` (`http://localhost:9090/targets`), vérifier que le backend tourne bien sur le port déclaré dans `backend/monitoring/prometheus.yml` (3001 par défaut, à aligner avec `PORT` dans `.env`).
+
 ---
 
 ## 4. Backend — API
@@ -272,6 +299,12 @@ Toutes les routes protégées exigent l'en-tête `Authorization: Bearer <accessT
 | GET | `/admin/produits` | Tous les produits (modération) |
 | PATCH | `/admin/produits/:id/toggle?active=` | Retirer/restaurer un produit |
 | GET/PATCH | `/admin/parametres` | Paramètres globaux de la plateforme |
+
+**Observabilité** (`/metrics`)
+
+| Méthode | Route | Accès | Description |
+|---|---|---|---|
+| GET | `/metrics` | public (à restreindre au réseau interne en production) | Métriques Prometheus (format texte) — voir §3.7 |
 
 ### 4.4 Mode hors-ligne côté serveur
 

@@ -5,11 +5,13 @@ import { EvenementSync, SyncAction, SyncStatut } from './entities/evenement-sync
 import { CommandesService } from '../commandes/commandes.service';
 import { CommandeStatut } from '../commandes/entities/commande.entity';
 import { UserRole } from '../users/entities/user.entity';
+import { MetricsService } from '../metrics/metrics.service';
 
 describe('SyncService', () => {
   let service: SyncService;
   let syncRepo: any;
   let commandesService: any;
+  let metricsService: any;
 
   beforeEach(async () => {
     syncRepo = {
@@ -18,12 +20,14 @@ describe('SyncService', () => {
       save: jest.fn((x) => Promise.resolve({ id: 'evt-db-id', ...x })),
     };
     commandesService = { updateStatut: jest.fn() };
+    metricsService = { qrValidationsTotal: { inc: jest.fn() } };
 
     const module = await Test.createTestingModule({
       providers: [
         SyncService,
         { provide: getRepositoryToken(EvenementSync), useValue: syncRepo },
         { provide: CommandesService, useValue: commandesService },
+        { provide: MetricsService, useValue: metricsService },
       ],
     }).compile();
 
@@ -61,6 +65,24 @@ describe('SyncService', () => {
     expect(commandesService.updateStatut).toHaveBeenCalledWith(
       'cmd1', { statut: CommandeStatut.RECUPEREE }, 'user1', UserRole.COMMERCANT,
     );
+  });
+
+  it('comptabilise une validation QR réussie sur RETRAIT_VALIDE', async () => {
+    syncRepo.findOne.mockResolvedValue(null);
+    commandesService.updateStatut.mockResolvedValue({});
+
+    await service.processBatch([baseEvent], 'user1', UserRole.COMMERCANT);
+
+    expect(metricsService.qrValidationsTotal.inc).toHaveBeenCalledWith({ resultat: 'succes' });
+  });
+
+  it('comptabilise une validation QR échouée sur RETRAIT_VALIDE (ex. anti-rejeu)', async () => {
+    syncRepo.findOne.mockResolvedValue(null);
+    commandesService.updateStatut.mockRejectedValue(new Error('Ce billet a déjà été retiré.'));
+
+    await service.processBatch([baseEvent], 'user1', UserRole.COMMERCANT);
+
+    expect(metricsService.qrValidationsTotal.inc).toHaveBeenCalledWith({ resultat: 'echec' });
   });
 
   it('marque un événement STATUT_CHANGE comme synchronisé en cas de succès', async () => {

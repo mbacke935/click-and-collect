@@ -11,6 +11,7 @@ import { ProduitsService } from '../produits/produits.service';
 import { BoutiquesService } from '../boutiques/boutiques.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { UserRole } from '../users/entities/user.entity';
+import { MetricsService } from '../metrics/metrics.service';
 
 describe('CommandesService', () => {
   let service: CommandesService;
@@ -22,6 +23,7 @@ describe('CommandesService', () => {
   let boutiquesService: any;
   let realtimeGateway: any;
   let configService: any;
+  let metricsService: any;
 
   beforeEach(async () => {
     commandesRepo = {
@@ -36,6 +38,7 @@ describe('CommandesService', () => {
     boutiquesService = { findOne: jest.fn(), findByIds: jest.fn().mockResolvedValue([]) };
     realtimeGateway = { emitCommandeUpdate: jest.fn() };
     configService = { get: jest.fn(() => 'qr-ticket-shared-secret-dev') };
+    metricsService = { ordersTotal: { inc: jest.fn() }, commandesRecupereesTotal: { inc: jest.fn() } };
 
     const module = await Test.createTestingModule({
       providers: [
@@ -48,6 +51,7 @@ describe('CommandesService', () => {
         { provide: BoutiquesService, useValue: boutiquesService },
         { provide: RealtimeGateway, useValue: realtimeGateway },
         { provide: ConfigService, useValue: configService },
+        { provide: MetricsService, useValue: metricsService },
       ],
     }).compile();
 

@@ -13,6 +13,7 @@ import { ProduitsService } from '../produits/produits.service';
 import { BoutiquesService } from '../boutiques/boutiques.service';
 import { UserRole } from '../users/entities/user.entity';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { MetricsService } from '../metrics/metrics.service';
 
 // Commande augmentée du nom et de l'adresse de sa boutique — nécessaires pour que le reçu
 // et le billet restent lisibles hors-ligne (cf. dossier de spécifications §Module 3 :
@@ -35,6 +36,7 @@ export class CommandesService {
     private readonly boutiquesService: BoutiquesService,
     private readonly realtimeGateway: RealtimeGateway,
     private readonly configService: ConfigService,
+    private readonly metricsService: MetricsService,
   ) {}
 
   async create(dto: CreateCommandeDto, clientId: string): Promise<CommandeAvecBoutique> {
@@ -87,6 +89,8 @@ export class CommandesService {
     await this.billetsRepository.save(billet);
 
     await this.paniersService.valider(panier.id);
+
+    this.metricsService.ordersTotal.inc();
 
     const commandeComplete = await this.findOneEnrichi(saved.id);
     this.realtimeGateway.emitCommandeUpdate(commandeComplete);
@@ -175,6 +179,9 @@ export class CommandesService {
     if (dto.statut === CommandeStatut.RECUPEREE && commande.billet) {
       commande.billet.dateRetrait = new Date();
       await this.billetsRepository.save(commande.billet);
+      this.metricsService.commandesRecupereesTotal.inc({
+        heure_creneau: commande.creneau?.heureDebut ?? 'inconnu',
+      });
     }
     if (dto.statut === CommandeStatut.ANNULEE && commande.creneau_id) {
       await this.creneauxService.liberer(commande.creneau_id);

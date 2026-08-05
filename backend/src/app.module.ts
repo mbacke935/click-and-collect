@@ -13,6 +13,7 @@ import { CommandesModule } from './commandes/commandes.module';
 import { SyncModule } from './sync/sync.module';
 import { PaymentsModule } from './payments/payments.module';
 import { AdminModule } from './admin/admin.module';
+import { MetricsModule } from './metrics/metrics.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { AdminModule } from './admin/admin.module';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => configService.get('database'),
     }),
+    MetricsModule,
     UsersModule, AuthModule, BoutiquesModule, ProduitsModule,
     CreneauxModule, PaniersModule, CommandesModule,
     SyncModule, PaymentsModule, AdminModule,

@@ -1,0 +1,110 @@
+{
+  "id": null,
+  "uid": "click-and-collect",
+  "title": "Click & Collect — Observabilité",
+  "description": "Débit de commandes, réservation de créneaux, validations QR Code et santé de l'API d'inventaire.",
+  "tags": ["click-and-collect"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Débit de commandes (par minute)",
+      "description": "orders_total — nombre de commandes enregistrées par minute.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "drawStyle": "line", "fillOpacity": 15 } }, "overrides": [] },
+      "targets": [
+        { "expr": "rate(orders_total[1m]) * 60", "legendFormat": "commandes/min", "refId": "A" }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "barchart",
+      "title": "Commandes validées par créneau horaire",
+      "description": "Retraits confirmés (statut « récupérée ») sur la dernière heure, groupés par heure de début de créneau.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum by (heure_creneau) (increase(commandes_recuperees_total[1h]))", "legendFormat": "{{heure_creneau}}", "refId": "A", "instant": true }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Latence de réservation des créneaux de retrait",
+      "description": "Temps passé sous verrou transactionnel lors de CreneauxService.reserver (p50/p95).",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum(rate(creneau_reservation_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p50", "refId": "A" },
+        { "expr": "histogram_quantile(0.95, sum(rate(creneau_reservation_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95", "refId": "B" }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Validations QR Code — succès vs échec",
+      "description": "Retraits validés sur le terminal commerçant (POST /sync, action retrait_valide), par résultat.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "drawStyle": "bars", "fillOpacity": 60, "stacking": { "mode": "normal" } } }, "overrides": [
+        { "matcher": { "id": "byName", "options": "echec" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }] },
+        { "matcher": { "id": "byName", "options": "succes" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }] }
+      ] },
+      "targets": [
+        { "expr": "sum by (resultat) (rate(qr_validations_total[5m]))", "legendFormat": "{{resultat}}", "refId": "A" }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Taux d'échec de validation QR Code",
+      "description": "Seuil d'alerte critique : 3 % (voir alert-rules.yml, QrValidationFailureRateHigh).",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 0.01 },
+              { "color": "red", "value": 0.03 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": { "graphMode": "area", "colorMode": "background", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [
+        { "expr": "sum(rate(qr_validations_total{resultat=\"echec\"}[5m])) / sum(rate(qr_validations_total[5m]))", "legendFormat": "taux d'échec", "refId": "A" }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Taux d'erreur — API de mise à jour des inventaires",
+      "description": "PATCH /boutiques/:boutiqueId/produits/:id — proportion de réponses 4xx/5xx.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "max": 1, "min": 0, "custom": { "drawStyle": "line", "fillOpacity": 15 } }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{route=\"/boutiques/:boutiqueId/produits/:id\", method=\"PATCH\", status_code=~\"4..|5..\"}[5m])) / sum(rate(http_requests_total{route=\"/boutiques/:boutiqueId/produits/:id\", method=\"PATCH\"}[5m]))",
+          "legendFormat": "taux d'erreur",
+          "refId": "A"
+        }
+      ]
+    }
+  ]
+}

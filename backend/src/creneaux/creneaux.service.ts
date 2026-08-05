@@ -5,6 +5,7 @@ import { Creneau } from './entities/creneau.entity';
 import { CreateCreneauDto } from './dto/create-creneau.dto';
 import { BoutiquesService } from '../boutiques/boutiques.service';
 import { UserRole } from '../users/entities/user.entity';
+import { MetricsService } from '../metrics/metrics.service';
 
 @Injectable()
 export class CreneauxService {
@@ -12,6 +13,7 @@ export class CreneauxService {
     @InjectRepository(Creneau) private readonly creneauxRepository: Repository<Creneau>,
     private readonly boutiquesService: BoutiquesService,
     private readonly dataSource: DataSource,
+    private readonly metricsService: MetricsService,
   ) {}
 
   findByBoutique(boutiqueId: string, jour?: string): Promise<Creneau[]> {
@@ -36,14 +38,19 @@ export class CreneauxService {
 
   // Verrou transactionnel pessimiste — empêche la surréservation en cas de concurrence
   async reserver(id: string): Promise<Creneau> {
-    return this.dataSource.transaction(async (manager) => {
-      const creneau = await manager.createQueryBuilder(Creneau, 'c')
-        .setLock('pessimistic_write').where('c.id = :id', { id }).getOne();
-      if (!creneau) throw new NotFoundException(`Créneau ${id} introuvable.`);
-      if (creneau.capaciteRestante <= 0) throw new BadRequestException('Ce créneau est complet.');
-      creneau.capaciteRestante -= 1;
-      return manager.save(creneau);
-    });
+    const arreterChrono = this.metricsService.creneauReservationDuration.startTimer();
+    try {
+      return await this.dataSource.transaction(async (manager) => {
+        const creneau = await manager.createQueryBuilder(Creneau, 'c')
+          .setLock('pessimistic_write').where('c.id = :id', { id }).getOne();
+        if (!creneau) throw new NotFoundException(`Créneau ${id} introuvable.`);
+        if (creneau.capaciteRestante <= 0) throw new BadRequestException('Ce créneau est complet.');
+        creneau.capaciteRestante -= 1;
+        return manager.save(creneau);
+      });
+    } finally {
+      arreterChrono();
+    }
   }
 
   async liberer(id: string): Promise<Creneau> {

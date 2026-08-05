@@ -5,6 +5,7 @@ import { DataSource } from 'typeorm';
 import { CreneauxService } from './creneaux.service';
 import { Creneau } from './entities/creneau.entity';
 import { BoutiquesService } from '../boutiques/boutiques.service';
+import { MetricsService } from '../metrics/metrics.service';
 
 function fakeManager(creneau: Partial<Creneau> | null) {
   const queryBuilder = {
@@ -23,11 +24,13 @@ describe('CreneauxService', () => {
   let dataSource: { transaction: jest.Mock };
   let boutiquesService: { findOne: jest.Mock };
   let repo: any;
+  let metricsService: any;
 
   beforeEach(async () => {
     repo = { create: jest.fn((x) => x), save: jest.fn((x) => Promise.resolve(x)) };
     dataSource = { transaction: jest.fn() };
     boutiquesService = { findOne: jest.fn() };
+    metricsService = { creneauReservationDuration: { startTimer: jest.fn(() => jest.fn()) } };
 
     const module = await Test.createTestingModule({
       providers: [
@@ -35,6 +38,7 @@ describe('CreneauxService', () => {
         { provide: getRepositoryToken(Creneau), useValue: repo },
         { provide: BoutiquesService, useValue: boutiquesService },
         { provide: DataSource, useValue: dataSource },
+        { provide: MetricsService, useValue: metricsService },
       ],
     }).compile();
 

@@ -27,6 +27,19 @@ services:
     ports:
       - "9090:9090"
 
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: click-and-collect-alertmanager
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      # Secrets Slack/SMTP montés séparément (jamais commités, voir *.example) :
+      # référencés via api_url_file / smtp_auth_password_file dans alertmanager.yml.
+      - ./monitoring/alertmanager/secrets:/etc/alertmanager/secrets:ro
+      - alertmanager_data:/alertmanager
+    ports:
+      - "9093:9093"
+
   grafana:
     image: grafana/grafana:latest
     container_name: click-and-collect-grafana
@@ -51,3 +64,4 @@ volumes:
   postgres_data:
   prometheus_data:
   grafana_data:
+  alertmanager_data:

@@ -6,6 +6,10 @@ node_modules/
 .env.*
 !.env.example
 
+# Alertmanager (secrets Slack/SMTP — ne jamais committer)
+backend/monitoring/alertmanager/secrets/*
+!backend/monitoring/alertmanager/secrets/*.example
+
 # Backend (NestJS)
 backend/dist/
 backend/coverage/

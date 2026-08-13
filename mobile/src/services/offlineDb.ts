@@ -24,7 +24,16 @@ export async function getCommandesHorsLigne(): Promise<any[]> {
   const rows = await db.getAllAsync<{ data: string }>(
     'SELECT data FROM commandes_cache ORDER BY dateCommande DESC',
   );
-  const commandes = await Promise.all(rows.map((r) => decryptFromLocalCache(r.data)));
+  const commandes: any[] = [];
+  for (const row of rows) {
+    try {
+      commandes.push(await decryptFromLocalCache(row.data));
+    } catch {
+      // Entrée illisible (ex. chiffrée avec une ancienne clé d'appareil après
+      // réinitialisation du Keychain/SecureStore) : on l'ignore plutôt que de faire
+      // échouer toute la lecture du cache pour une seule ligne corrompue.
+    }
+  }
   return commandes;
 }
 

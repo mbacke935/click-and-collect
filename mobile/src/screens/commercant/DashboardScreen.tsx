@@ -37,39 +37,50 @@ export default function DashboardScreen({ navigation }: any) {
   useFocusEffect(
     useCallback(() => {
       (async () => {
-        // Tentative opportuniste de rattrapage : si des retraits ont été validés hors-ligne
-        // (voir ScanRetraitScreen), on essaie de les transmettre dès que ce tableau de bord
-        // est ouvert avec une connexion disponible, avant de recompter ce qu'il en reste
-        // (voir cas d'utilisation Commerçant "Consulter les commandes en attente de sync").
-        await flushSyncQueue();
-        setEnAttenteSync(await countPendingEvents());
-
-        let bList: any[] = [];
-        let boutiquesHorsLigne = false;
         try {
-          const res = await api.get('/boutiques/me/boutiques');
-          bList = res.data;
-          await setCache(CACHE_BOUTIQUES, bList);
-        } catch {
-          bList = (await getCache<any[]>(CACHE_BOUTIQUES)) || [];
-          boutiquesHorsLigne = true;
-        }
-        setBoutiques(bList);
+          // Tentative opportuniste de rattrapage : si des retraits ont été validés hors-ligne
+          // (voir ScanRetraitScreen), on essaie de les transmettre dès que ce tableau de bord
+          // est ouvert avec une connexion disponible, avant de recompter ce qu'il en reste
+          // (voir cas d'utilisation Commerçant "Consulter les commandes en attente de sync").
+          await flushSyncQueue();
+          setEnAttenteSync(await countPendingEvents());
 
-        if (bList.length > 0) {
+          let bList: any[] = [];
+          let boutiquesHorsLigne = false;
           try {
-            const { data: cList } = await api.get(`/commandes/boutique/${bList[0].id}`);
-            setCommandes(cList);
-            setHorsLigne(boutiquesHorsLigne);
-            await saveCommandes(cList);
+            const res = await api.get('/boutiques/me/boutiques');
+            bList = res.data;
+            await setCache(CACHE_BOUTIQUES, bList);
           } catch {
-            setCommandes(await getCommandesHorsLigneParBoutique(bList[0].id));
-            setHorsLigne(true);
+            boutiquesHorsLigne = true;
+            try {
+              bList = (await getCache<any[]>(CACHE_BOUTIQUES)) || [];
+            } catch {
+              bList = [];
+            }
           }
-        } else {
-          setHorsLigne(boutiquesHorsLigne);
+          setBoutiques(bList);
+
+          if (bList.length > 0) {
+            try {
+              const { data: cList } = await api.get(`/commandes/boutique/${bList[0].id}`);
+              setCommandes(cList);
+              setHorsLigne(boutiquesHorsLigne);
+              await saveCommandes(cList);
+            } catch {
+              setHorsLigne(true);
+              try {
+                setCommandes(await getCommandesHorsLigneParBoutique(bList[0].id));
+              } catch {
+                setCommandes([]);
+              }
+            }
+          } else {
+            setHorsLigne(boutiquesHorsLigne);
+          }
+        } finally {
+          setLoading(false);
         }
-        setLoading(false);
       })();
     }, []),
   );

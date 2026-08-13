@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { Alert } from '../../utils/alert';
 import { COLORS } from '../../constants/theme';
 import StatusBadge from '../../components/StatusBadge';
 import api from '../../services/api';

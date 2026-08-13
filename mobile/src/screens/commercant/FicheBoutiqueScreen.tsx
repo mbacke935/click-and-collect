@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import {
-  View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator,
+  View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator,
 } from 'react-native';
 import * as Location from 'expo-location';
 import { COLORS } from '../../constants/theme';
 import api from '../../services/api';
+import { Alert } from '../../utils/alert';
 
 const CATEGORIES = [
   { valeur: 'boulangerie', label: 'Boulangerie' },

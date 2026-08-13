@@ -54,11 +54,16 @@ export async function getPendingEvents(): Promise<SyncQueueItem[]> {
 }
 
 export async function countPendingEvents(): Promise<number> {
-  const db = await getDb();
-  const row = await db.getFirstAsync<{ n: number }>(
-    "SELECT COUNT(*) as n FROM sync_queue WHERE statut != 'synced'",
-  );
-  return row?.n ?? 0;
+  try {
+    const db = await getDb();
+    const row = await db.getFirstAsync<{ n: number }>(
+      "SELECT COUNT(*) as n FROM sync_queue WHERE statut != 'synced'",
+    );
+    return row?.n ?? 0;
+  } catch {
+    // Stockage local indisponible (ex. SQLite non fiable sur le web) : rien à compter.
+    return 0;
+  }
 }
 
 // Tente d'envoyer tous les événements en attente (ou déjà en échec, pour une nouvelle
@@ -70,7 +75,13 @@ export async function countPendingEvents(): Promise<number> {
 // rejetés passent à "echec" (avec le message d'erreur conservé pour affichage) plutôt que
 // d'être traités comme un succès.
 export async function flushSyncQueue(): Promise<FlushResult> {
-  const pending = await getPendingEvents();
+  let pending: SyncQueueItem[];
+  try {
+    pending = await getPendingEvents();
+  } catch {
+    // Stockage local indisponible (ex. SQLite non fiable sur le web) : rien à synchroniser.
+    return { synced: 0, echecs: 0, remaining: 0, resultats: [] };
+  }
   if (pending.length === 0) return { synced: 0, echecs: 0, remaining: 0, resultats: [] };
 
   try {

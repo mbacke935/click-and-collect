@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert,
+  View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator,
 } from 'react-native';
 import { COLORS } from '../../constants/theme';
 import api from '../../services/api';
 import ProductCard from '../../components/ProductCard';
 import { JOURS, estOuvertMaintenant, formatPlageJour, jourActuel } from '../../utils/horaires';
+import { Alert } from '../../utils/alert';
 
 export default function CatalogueScreen({ route, navigation }: any) {
   const { boutique } = route.params;

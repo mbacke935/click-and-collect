@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, FlatList, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
 import { COLORS } from '../../constants/theme';
 import api from '../../services/api';
+import { Alert } from '../../utils/alert';
 
 export default function CreneauScreen({ route, navigation }: any) {
   const { boutiqueId, panierId, montant } = route.params;

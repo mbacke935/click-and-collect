@@ -1,5 +1,5 @@
 import { io, Socket } from 'socket.io-client';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '../storage/secureStore';
 import { API_URL } from '../constants/theme';
 
 let socket: Socket | null = null;

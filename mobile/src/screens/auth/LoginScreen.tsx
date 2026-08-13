@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator,
+  View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator,
 } from 'react-native';
 import Svg, { Path, Circle, Line } from 'react-native-svg';
 import { COLORS } from '../../constants/theme';
 import { useAuth } from '../../context/AuthContext';
+import { Alert } from '../../utils/alert';
 
 function EyeIcon({ visible }: { visible: boolean }) {
   return (

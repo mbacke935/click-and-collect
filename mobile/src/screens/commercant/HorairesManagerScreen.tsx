@@ -1,11 +1,13 @@
 import React, { useCallback, useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, Alert, ActivityIndicator, Switch,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Switch,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { COLORS } from '../../constants/theme';
 import api from '../../services/api';
 import { JOURS, type Horaires } from '../../utils/horaires';
+import { Alert } from '../../utils/alert';
+import PlatformDateTimeInput from '../../components/PlatformDateTimeInput';
 
 type FormJour = { ouvert: boolean; debut: string; fin: string };
 type Form = Record<string, FormJour>;
@@ -87,16 +89,18 @@ export default function HorairesManagerScreen({ route }: any) {
             </View>
             {jour.ouvert && (
               <View style={styles.row}>
-                <TextInput
-                  style={[styles.input, styles.rowInput]} placeholder="Début (HH:mm)"
-                  placeholderTextColor={COLORS.mutedLight}
-                  value={jour.debut} onChangeText={(v) => majJour(cle, { debut: v })}
-                />
-                <TextInput
-                  style={[styles.input, styles.rowInput]} placeholder="Fin (HH:mm)"
-                  placeholderTextColor={COLORS.mutedLight}
-                  value={jour.fin} onChangeText={(v) => majJour(cle, { fin: v })}
-                />
+                <View style={styles.rowInput}>
+                  <PlatformDateTimeInput
+                    mode="time" placeholder="Heure d'ouverture" style={styles.input}
+                    value={jour.debut} onChange={(v) => majJour(cle, { debut: v })}
+                  />
+                </View>
+                <View style={styles.rowInput}>
+                  <PlatformDateTimeInput
+                    mode="time" placeholder="Heure de fermeture" style={styles.input}
+                    value={jour.fin} onChange={(v) => majJour(cle, { fin: v })}
+                  />
+                </View>
               </View>
             )}
           </View>

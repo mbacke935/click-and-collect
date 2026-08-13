@@ -1,4 +1,4 @@
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from './secureStore';
 import * as Crypto from 'expo-crypto';
 
 const CACHE_KEY_STORAGE_NAME = 'cacheEncryptionKeyHex';

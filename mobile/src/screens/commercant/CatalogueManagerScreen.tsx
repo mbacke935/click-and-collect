@@ -1,10 +1,11 @@
 import React, { useCallback, useState } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet, Alert, ActivityIndicator,
+  View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet, ActivityIndicator,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { COLORS } from '../../constants/theme';
 import api from '../../services/api';
+import { Alert } from '../../utils/alert';
 
 const VIDE = { nom: '', prix: '', categorie: '', quantiteStock: '' };
 

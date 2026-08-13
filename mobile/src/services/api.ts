@@ -1,5 +1,5 @@
 import axios from 'axios';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '../storage/secureStore';
 import { API_URL } from '../constants/theme';
 
 // Timeout explicite : sans lui, une requête vers une API_URL injoignable (ex. adresse IP

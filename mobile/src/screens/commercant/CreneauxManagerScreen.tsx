@@ -1,10 +1,12 @@
 import React, { useCallback, useState } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet, Alert, ActivityIndicator,
+  View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet, ActivityIndicator,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { COLORS } from '../../constants/theme';
 import api from '../../services/api';
+import { Alert } from '../../utils/alert';
+import PlatformDateTimeInput from '../../components/PlatformDateTimeInput';
 
 const VIDE = { jour: '', heureDebut: '', heureFin: '', capaciteMax: '5' };
 
@@ -88,19 +90,23 @@ export default function CreneauxManagerScreen({ route }: any) {
 
       <View style={styles.form}>
         <Text style={styles.formTitle}>Nouveau créneau</Text>
-        <TextInput
-          style={styles.input} placeholder="Jour (AAAA-MM-JJ)" placeholderTextColor={COLORS.mutedLight}
-          value={form.jour} onChangeText={(v) => setForm((f) => ({ ...f, jour: v }))}
+        <PlatformDateTimeInput
+          mode="date" placeholder="Choisir le jour" style={styles.input}
+          value={form.jour} onChange={(v) => setForm((f) => ({ ...f, jour: v }))}
         />
         <View style={styles.row}>
-          <TextInput
-            style={[styles.input, styles.rowInput]} placeholder="Début (HH:mm)" placeholderTextColor={COLORS.mutedLight}
-            value={form.heureDebut} onChangeText={(v) => setForm((f) => ({ ...f, heureDebut: v }))}
-          />
-          <TextInput
-            style={[styles.input, styles.rowInput]} placeholder="Fin (HH:mm)" placeholderTextColor={COLORS.mutedLight}
-            value={form.heureFin} onChangeText={(v) => setForm((f) => ({ ...f, heureFin: v }))}
-          />
+          <View style={styles.rowInput}>
+            <PlatformDateTimeInput
+              mode="time" placeholder="Heure de début" style={styles.input}
+              value={form.heureDebut} onChange={(v) => setForm((f) => ({ ...f, heureDebut: v }))}
+            />
+          </View>
+          <View style={styles.rowInput}>
+            <PlatformDateTimeInput
+              mode="time" placeholder="Heure de fin" style={styles.input}
+              value={form.heureFin} onChange={(v) => setForm((f) => ({ ...f, heureFin: v }))}
+            />
+          </View>
         </View>
         <TextInput
           style={styles.input} placeholder="Capacité max" placeholderTextColor={COLORS.mutedLight}

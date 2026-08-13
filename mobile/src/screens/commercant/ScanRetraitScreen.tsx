@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { COLORS } from '../../constants/theme';
 import { decryptBilletPayload } from '../../crypto/qrCipher';
 import { enqueueEvent, flushSyncQueue } from '../../services/syncService';
 import { billetCode, normaliserCodeSaisi } from '../../utils/billetCode';
+import { Alert } from '../../utils/alert';
 
 // Valide un billet de retrait entièrement hors-ligne, par deux moyens équivalents :
 // - le QR scanné contient le qrCodePayload chiffré généré par le serveur à la commande ;

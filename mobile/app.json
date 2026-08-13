@@ -30,7 +30,8 @@
         {
           "locationWhenInUsePermission": "Utilisée pour trier les commerces les plus proches de vous."
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ]
   }
 }

@@ -1,10 +1,11 @@
 import React, { useCallback, useState } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, ActivityIndicator,
+  View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { COLORS } from '../../constants/theme';
 import { getPendingEvents, flushSyncQueue, type SyncQueueItem } from '../../services/syncService';
+import { Alert } from '../../utils/alert';
 
 const ACTION_LABELS: Record<string, string> = {
   retrait_valide: 'Retrait validé hors-ligne',

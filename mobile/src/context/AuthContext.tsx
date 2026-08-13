@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { authService, LoginPayload, RegisterPayload } from '../services/authService';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '../storage/secureStore';
 import { connectSocket, disconnectSocket } from '../services/socketService';
 import { setSessionExpiredHandler } from '../services/api';
 
@@ -32,14 +32,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     (async () => {
-      const token = await SecureStore.getItemAsync('accessToken');
-      if (token) {
-        const decoded = decodeToken(token);
-        setUserRole(decoded?.role || null);
-        setIsLoggedIn(true);
-        connectSocket();
+      try {
+        const token = await SecureStore.getItemAsync('accessToken');
+        if (token) {
+          const decoded = decodeToken(token);
+          setUserRole(decoded?.role || null);
+          setIsLoggedIn(true);
+          connectSocket();
+        }
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     })();
   }, []);
 

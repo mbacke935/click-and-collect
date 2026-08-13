@@ -1,5 +1,5 @@
 import api from './api';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '../storage/secureStore';
 
 export interface LoginPayload {
   email: string;

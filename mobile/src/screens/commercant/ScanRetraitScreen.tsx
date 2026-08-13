@@ -42,69 +42,82 @@ export default function ScanRetraitScreen({ route, navigation }: any) {
       return;
     }
 
-    let commandeId = commande?.id;
-    let billetId = commande?.billet?.id;
+    try {
+      let commandeId = commande?.id;
+      let billetId = commande?.billet?.id;
 
-    if (commande) {
-      if (billet.commandeId !== commande.id) {
-        Alert.alert('Billet incorrect', "Ce billet correspond à une autre commande.");
+      if (commande) {
+        if (billet.commandeId !== commande.id) {
+          Alert.alert('Billet incorrect', "Ce billet correspond à une autre commande.");
+          setScanned(false);
+          return;
+        }
+      } else {
+        if (boutiqueId && billet.boutique !== boutiqueId) {
+          Alert.alert('Billet incorrect', "Ce billet ne correspond pas à cette boutique.");
+          setScanned(false);
+          return;
+        }
+        commandeId = billet.commandeId;
+        const cachees = await getCommandesHorsLigneParBoutique(boutiqueId);
+        billetId = cachees.find((c) => c.id === billet.commandeId)?.billet?.id;
+      }
+
+      const eventId = await enqueueEvent('retrait_valide', commandeId, billetId, { statut: 'recuperee' });
+      const { resultats } = await flushSyncQueue();
+      const resultat = resultats.find((r) => r.eventId === eventId);
+
+      // Le serveur a explicitement rejeté ce retrait (ex. billet déjà retiré depuis un autre
+      // appareil, §5.4 anti-rejeu) : il ne faut surtout pas afficher l'écran de succès.
+      if (resultat?.statut === 'echec') {
+        Alert.alert('Retrait refusé', resultat.erreur || 'Ce retrait ne peut pas être validé.');
         setScanned(false);
         return;
       }
-    } else {
-      if (boutiqueId && billet.boutique !== boutiqueId) {
-        Alert.alert('Billet incorrect', "Ce billet ne correspond pas à cette boutique.");
-        setScanned(false);
-        return;
-      }
-      commandeId = billet.commandeId;
-      const cachees = await getCommandesHorsLigneParBoutique(boutiqueId);
-      billetId = cachees.find((c) => c.id === billet.commandeId)?.billet?.id;
-    }
 
-    const eventId = await enqueueEvent('retrait_valide', commandeId, billetId, { statut: 'recuperee' });
-    const { resultats } = await flushSyncQueue();
-    const resultat = resultats.find((r) => r.eventId === eventId);
-
-    // Le serveur a explicitement rejeté ce retrait (ex. billet déjà retiré depuis un autre
-    // appareil, §5.4 anti-rejeu) : il ne faut surtout pas afficher l'écran de succès.
-    if (resultat?.statut === 'echec') {
-      Alert.alert('Retrait refusé', resultat.erreur || 'Ce retrait ne peut pas être validé.');
+      // Pas de résultat renvoyé : appareil hors-ligne, l'événement reste en attente locale.
+      setEnAttenteSync(!resultat);
+      setDone(true);
+    } catch (e: any) {
+      Alert.alert('Erreur', e?.message || 'Une erreur inattendue est survenue pendant la validation.');
       setScanned(false);
-      return;
     }
-
-    // Pas de résultat renvoyé : appareil hors-ligne, l'événement reste en attente locale.
-    setEnAttenteSync(!resultat);
-    setDone(true);
   };
 
   const validerParCode = async () => {
-    if (commande) {
-      if (!commande.billet?.qrCodePayload) {
-        Alert.alert('Erreur', 'Aucun billet associé à cette commande.');
-        return;
-      }
-      if (normaliserCodeSaisi(code) !== billetCode(commande.id)) {
-        Alert.alert('Code incorrect', "Ce code ne correspond pas au billet de cette commande.");
-        return;
-      }
-      // Le code saisi correspond à celui affiché sur le billet du client : on rejoue le
-      // contrôle d'intégrité local sur le qrCodePayload déjà connu de la commande.
-      validerBillet(commande.billet.qrCodePayload);
+    if (!code.trim()) {
+      Alert.alert('Code manquant', 'Saisissez le code affiché sur le billet du client.');
       return;
     }
+    try {
+      if (commande) {
+        if (!commande.billet?.qrCodePayload) {
+          Alert.alert('Erreur', 'Aucun billet associé à cette commande.');
+          return;
+        }
+        if (normaliserCodeSaisi(code) !== billetCode(commande.id)) {
+          Alert.alert('Code incorrect', "Ce code ne correspond pas au billet de cette commande.");
+          return;
+        }
+        // Le code saisi correspond à celui affiché sur le billet du client : on rejoue le
+        // contrôle d'intégrité local sur le qrCodePayload déjà connu de la commande.
+        await validerBillet(commande.billet.qrCodePayload);
+        return;
+      }
 
-    // Pas de commande pré-sélectionnée : on cherche dans le cache local de la boutique
-    // celle dont le code court correspond, pour retrouver son qrCodePayload.
-    const cible = normaliserCodeSaisi(code);
-    const cachees = await getCommandesHorsLigneParBoutique(boutiqueId);
-    const trouvee = cachees.find((c) => billetCode(c.id) === cible && c.billet?.qrCodePayload);
-    if (!trouvee) {
-      Alert.alert('Code introuvable', "Aucune commande de cette boutique ne correspond à ce code sur cet appareil.");
-      return;
+      // Pas de commande pré-sélectionnée : on cherche dans le cache local de la boutique
+      // celle dont le code court correspond, pour retrouver son qrCodePayload.
+      const cible = normaliserCodeSaisi(code);
+      const cachees = await getCommandesHorsLigneParBoutique(boutiqueId);
+      const trouvee = cachees.find((c) => billetCode(c.id) === cible && c.billet?.qrCodePayload);
+      if (!trouvee) {
+        Alert.alert('Code introuvable', "Aucune commande de cette boutique ne correspond à ce code sur cet appareil.");
+        return;
+      }
+      await validerBillet(trouvee.billet.qrCodePayload);
+    } catch (e: any) {
+      Alert.alert('Erreur', e?.message || 'Une erreur inattendue est survenue pendant la recherche du billet.');
     }
-    validerBillet(trouvee.billet.qrCodePayload);
   };
 
   if (done) {

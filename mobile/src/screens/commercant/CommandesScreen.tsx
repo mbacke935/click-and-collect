@@ -35,6 +35,20 @@ export default function CommandesScreen({ route, navigation }: any) {
       <Text style={styles.info}>
         Créneau : {commande.creneau?.jour || '—'} · {commande.creneau?.heureDebut || '—'}–{commande.creneau?.heureFin || '—'}
       </Text>
+
+      {commande.panier?.lignes?.length > 0 && (
+        <View style={styles.receiptBlock}>
+          <Text style={styles.receiptTitle}>À préparer</Text>
+          {commande.panier.lignes.map((ligne: any) => (
+            <View key={ligne.id} style={styles.receiptRow}>
+              <Text style={styles.receiptQty}>×{ligne.quantite}</Text>
+              <Text style={styles.receiptNom} numberOfLines={1}>{ligne.produit?.nom || 'Article'}</Text>
+              <Text style={styles.receiptPrix}>{(ligne.prixUnitaire * ligne.quantite).toLocaleString()} FCFA</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
       <View style={{ flex: 1 }} />
       {next && next.statut && (
         <TouchableOpacity style={styles.btn} onPress={() => changerStatut(next.statut)}>
@@ -61,4 +75,13 @@ const styles = StyleSheet.create({
   info: { color: COLORS.muted, fontSize: 13 },
   btn: { backgroundColor: COLORS.gold, paddingVertical: 14, borderRadius: 6, alignItems: 'center', marginBottom: 10 },
   btnText: { color: COLORS.black, fontWeight: '700', fontSize: 15 },
+  receiptBlock: {
+    backgroundColor: COLORS.blackCard, borderWidth: 1, borderColor: COLORS.line,
+    borderRadius: 6, padding: 14, marginTop: 4,
+  },
+  receiptTitle: { color: COLORS.gold, fontSize: 13, fontWeight: '700', marginBottom: 10, textTransform: 'uppercase' },
+  receiptRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 6 },
+  receiptQty: { color: COLORS.muted, fontSize: 13, width: 28 },
+  receiptNom: { flex: 1, color: COLORS.white, fontSize: 14 },
+  receiptPrix: { color: COLORS.white, fontFamily: 'monospace', fontSize: 13 },
 });

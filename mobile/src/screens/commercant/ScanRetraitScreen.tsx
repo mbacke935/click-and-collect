@@ -6,6 +6,7 @@ import { decryptBilletPayload } from '../../crypto/qrCipher';
 import { enqueueEvent, flushSyncQueue } from '../../services/syncService';
 import { billetCode, normaliserCodeSaisi } from '../../utils/billetCode';
 import { Alert } from '../../utils/alert';
+import { getCommandesHorsLigneParBoutique } from '../../services/offlineDb';
 
 // Valide un billet de retrait entièrement hors-ligne, par deux moyens équivalents :
 // - le QR scanné contient le qrCodePayload chiffré généré par le serveur à la commande ;
@@ -18,7 +19,13 @@ import { Alert } from '../../utils/alert';
 // ensuite empilé dans la file de synchronisation locale et transmis dès que le réseau
 // revient (§3.5 étapes 4-5).
 export default function ScanRetraitScreen({ route, navigation }: any) {
-  const { commande } = route.params;
+  // `commande` : venu de CommandesScreen pour un billet déjà identifié (statut "prete").
+  // Sans `commande` (entrée directe depuis le tableau de bord) : la cible est déterminée
+  // par le billet scanné lui-même, en le retrouvant dans le cache local de la boutique
+  // (pour rester utilisable hors-ligne) — le rejeu anti-fraude reste de toute façon
+  // tranché côté serveur (§5.4), ce lookup ne sert qu'à retrouver le billet_id à des fins
+  // de traçabilité et à vérifier que le billet correspond bien à cette boutique.
+  const { commande, boutiqueId } = route.params || {};
   const [permission, requestPermission] = useCameraPermissions();
   const [code, setCode] = useState('');
   const [scanned, setScanned] = useState(false);
@@ -35,13 +42,27 @@ export default function ScanRetraitScreen({ route, navigation }: any) {
       return;
     }
 
-    if (billet.commandeId !== commande.id) {
-      Alert.alert('Billet incorrect', "Ce billet correspond à une autre commande.");
-      setScanned(false);
-      return;
+    let commandeId = commande?.id;
+    let billetId = commande?.billet?.id;
+
+    if (commande) {
+      if (billet.commandeId !== commande.id) {
+        Alert.alert('Billet incorrect', "Ce billet correspond à une autre commande.");
+        setScanned(false);
+        return;
+      }
+    } else {
+      if (boutiqueId && billet.boutique !== boutiqueId) {
+        Alert.alert('Billet incorrect', "Ce billet ne correspond pas à cette boutique.");
+        setScanned(false);
+        return;
+      }
+      commandeId = billet.commandeId;
+      const cachees = await getCommandesHorsLigneParBoutique(boutiqueId);
+      billetId = cachees.find((c) => c.id === billet.commandeId)?.billet?.id;
     }
 
-    const eventId = await enqueueEvent('retrait_valide', commande.id, commande.billet?.id, { statut: 'recuperee' });
+    const eventId = await enqueueEvent('retrait_valide', commandeId, billetId, { statut: 'recuperee' });
     const { resultats } = await flushSyncQueue();
     const resultat = resultats.find((r) => r.eventId === eventId);
 
@@ -58,18 +79,32 @@ export default function ScanRetraitScreen({ route, navigation }: any) {
     setDone(true);
   };
 
-  const validerParCode = () => {
-    if (!commande.billet?.qrCodePayload) {
-      Alert.alert('Erreur', 'Aucun billet associé à cette commande.');
+  const validerParCode = async () => {
+    if (commande) {
+      if (!commande.billet?.qrCodePayload) {
+        Alert.alert('Erreur', 'Aucun billet associé à cette commande.');
+        return;
+      }
+      if (normaliserCodeSaisi(code) !== billetCode(commande.id)) {
+        Alert.alert('Code incorrect', "Ce code ne correspond pas au billet de cette commande.");
+        return;
+      }
+      // Le code saisi correspond à celui affiché sur le billet du client : on rejoue le
+      // contrôle d'intégrité local sur le qrCodePayload déjà connu de la commande.
+      validerBillet(commande.billet.qrCodePayload);
       return;
     }
-    if (normaliserCodeSaisi(code) !== billetCode(commande.id)) {
-      Alert.alert('Code incorrect', "Ce code ne correspond pas au billet de cette commande.");
+
+    // Pas de commande pré-sélectionnée : on cherche dans le cache local de la boutique
+    // celle dont le code court correspond, pour retrouver son qrCodePayload.
+    const cible = normaliserCodeSaisi(code);
+    const cachees = await getCommandesHorsLigneParBoutique(boutiqueId);
+    const trouvee = cachees.find((c) => billetCode(c.id) === cible && c.billet?.qrCodePayload);
+    if (!trouvee) {
+      Alert.alert('Code introuvable', "Aucune commande de cette boutique ne correspond à ce code sur cet appareil.");
       return;
     }
-    // Le code saisi correspond à celui affiché sur le billet du client : on rejoue le
-    // contrôle d'intégrité local sur le qrCodePayload déjà connu de la commande.
-    validerBillet(commande.billet.qrCodePayload);
+    validerBillet(trouvee.billet.qrCodePayload);
   };
 
   if (done) {

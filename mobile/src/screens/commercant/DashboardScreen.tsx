@@ -143,6 +143,12 @@ export default function DashboardScreen({ navigation }: any) {
         </View>
       ) : (
         <>
+          <TouchableOpacity
+            style={styles.scanBtn}
+            onPress={() => navigation.navigate('ScanRetrait', { boutiqueId: boutiques[0]?.id })}
+          >
+            <Text style={styles.scanBtnText}>Scanner un billet de retrait</Text>
+          </TouchableOpacity>
           <View style={styles.manageRow}>
             <TouchableOpacity
               style={styles.manageChip}
@@ -224,6 +230,8 @@ const styles = StyleSheet.create({
   emptyBoutiqueText: { color: COLORS.muted, fontSize: 14, lineHeight: 20, marginBottom: 16, textAlign: 'center' },
   btn: { backgroundColor: COLORS.gold, paddingVertical: 14, borderRadius: 6, alignItems: 'center' },
   btnText: { color: COLORS.black, fontWeight: '700', fontSize: 15 },
+  scanBtn: { backgroundColor: COLORS.gold, paddingVertical: 14, borderRadius: 6, alignItems: 'center', marginBottom: 14 },
+  scanBtnText: { color: COLORS.black, fontWeight: '700', fontSize: 15 },
   manageRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
   manageChip: { flexGrow: 1, minWidth: '30%', borderWidth: 1, borderColor: COLORS.goldDark, borderRadius: 6, paddingVertical: 10, alignItems: 'center' },
   manageChipText: { color: COLORS.gold, fontSize: 12, fontWeight: '600' },

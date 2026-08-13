@@ -25,6 +25,17 @@ export default function CommandesScreen({ route, navigation }: any) {
     }
   };
 
+  const annuler = () => {
+    Alert.alert(
+      'Annuler la commande ?',
+      'Le stock et le créneau seront libérés. Cette action est irréversible.',
+      [
+        { text: 'Retour', style: 'cancel' },
+        { text: 'Annuler la commande', style: 'destructive', onPress: () => changerStatut('annulee') },
+      ],
+    );
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -63,6 +74,11 @@ export default function CommandesScreen({ route, navigation }: any) {
           <Text style={styles.btnText}>Scanner le billet de retrait</Text>
         </TouchableOpacity>
       )}
+      {commande.statut === 'recue' && (
+        <TouchableOpacity style={styles.btnAnnuler} onPress={annuler}>
+          <Text style={styles.btnAnnulerText}>Annuler la commande</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -75,6 +91,11 @@ const styles = StyleSheet.create({
   info: { color: COLORS.muted, fontSize: 13 },
   btn: { backgroundColor: COLORS.gold, paddingVertical: 14, borderRadius: 6, alignItems: 'center', marginBottom: 10 },
   btnText: { color: COLORS.black, fontWeight: '700', fontSize: 15 },
+  btnAnnuler: {
+    backgroundColor: 'transparent', borderWidth: 1, borderColor: COLORS.red,
+    paddingVertical: 14, borderRadius: 6, alignItems: 'center',
+  },
+  btnAnnulerText: { color: COLORS.red, fontWeight: '700', fontSize: 15 },
   receiptBlock: {
     backgroundColor: COLORS.blackCard, borderWidth: 1, borderColor: COLORS.line,
     borderRadius: 6, padding: 14, marginTop: 4,

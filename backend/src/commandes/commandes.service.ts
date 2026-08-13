@@ -164,8 +164,15 @@ export class CommandesService {
   async updateStatut(id: string, dto: UpdateStatutDto, userId: string, userRole: string): Promise<Commande> {
     const commande = await this.findOne(id);
     const boutique = await this.boutiquesService.findOne(commande.boutique_id);
-    if (boutique.commercant_id !== userId && userRole !== UserRole.ADMINISTRATEUR)
-      throw new ForbiddenException('Accès refusé.');
+    const estProprietaire = boutique.commercant_id === userId || userRole === UserRole.ADMINISTRATEUR;
+    // Le client peut annuler sa propre commande, mais seulement tant qu'elle n'est pas
+    // encore passée en préparation : au-delà, seul le commerçant (qui a déjà commencé à
+    // sortir les articles) ou un administrateur peut agir sur le statut.
+    const estClientQuiAnnule =
+      commande.client_id === userId
+      && dto.statut === CommandeStatut.ANNULEE
+      && commande.statut === CommandeStatut.RECUE;
+    if (!estProprietaire && !estClientQuiAnnule) throw new ForbiddenException('Accès refusé.');
     // Anti-rejeu (§5.4) : un billet déjà retiré ne doit plus jamais pouvoir être revalidé,
     // y compris depuis un autre appareil ou un autre événement de synchronisation portant
     // un clientEventId différent — l'idempotence de SyncService protège du rejeu du même

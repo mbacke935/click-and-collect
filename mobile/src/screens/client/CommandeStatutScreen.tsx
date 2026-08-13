@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { COLORS } from '../../constants/theme';
 import StatusBadge from '../../components/StatusBadge';
 import QRCodeDisplay from '../../components/QRCodeDisplay';
 import { connectSocket } from '../../services/socketService';
 import { saveCommande } from '../../services/offlineDb';
 import { billetCode } from '../../utils/billetCode';
+import { Alert } from '../../utils/alert';
+import api from '../../services/api';
 
 const STEPS = ['recue', 'en_preparation', 'prete', 'recuperee'];
 const STEP_LABELS = ['Reçue', 'En préparation', 'Prête', 'Récupérée'];
@@ -32,6 +34,28 @@ export default function CommandeStatutScreen({ route }: any) {
     });
     return () => { active = false; sock?.off('commande:update', onUpdate); };
   }, [commande.id]);
+
+  const annuler = () => {
+    Alert.alert(
+      'Annuler la commande ?',
+      'Cette action est irréversible.',
+      [
+        { text: 'Retour', style: 'cancel' },
+        {
+          text: 'Annuler la commande',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const { data } = await api.patch(`/commandes/${commande.id}/statut`, { statut: 'annulee' });
+              setCommande((prev: any) => ({ ...prev, ...data }));
+            } catch (e: any) {
+              Alert.alert('Erreur', e.response?.data?.message || 'Échec de l\'annulation.');
+            }
+          },
+        },
+      ],
+    );
+  };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: 18, paddingTop: 16 }}>
@@ -93,6 +117,12 @@ export default function CommandeStatutScreen({ route }: any) {
       <Text style={styles.total}>
         Total : <Text style={{ fontFamily: 'monospace' }}>{commande.montantTotal?.toLocaleString()} FCFA</Text>
       </Text>
+
+      {commande.statut === 'recue' && (
+        <TouchableOpacity style={styles.btnAnnuler} onPress={annuler}>
+          <Text style={styles.btnAnnulerText}>Annuler la commande</Text>
+        </TouchableOpacity>
+      )}
     </ScrollView>
   );
 }
@@ -130,4 +160,9 @@ const styles = StyleSheet.create({
   receiptNom: { flex: 1, color: COLORS.white, fontSize: 14 },
   receiptPrix: { color: COLORS.white, fontFamily: 'monospace', fontSize: 13 },
   total: { color: COLORS.gold, fontSize: 16, fontWeight: '700', textAlign: 'center', marginTop: 10 },
+  btnAnnuler: {
+    backgroundColor: 'transparent', borderWidth: 1, borderColor: COLORS.red,
+    paddingVertical: 14, borderRadius: 6, alignItems: 'center', marginTop: 16,
+  },
+  btnAnnulerText: { color: COLORS.red, fontWeight: '700', fontSize: 15 },
 });

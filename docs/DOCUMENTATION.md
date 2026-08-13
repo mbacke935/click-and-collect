@@ -67,7 +67,7 @@ Le projet est composé de **trois applications indépendantes** partageant une s
 |---|---|
 | Base de données | PostgreSQL 16 (Docker) |
 | Backend | NestJS 11, TypeORM, JWT (`@nestjs/jwt`), Socket.IO (temps réel), bcrypt |
-| Application mobile | React Native 0.81 via Expo SDK 54 (workflow managé), React Navigation, `expo-sqlite`, `expo-secure-store`, `expo-camera`, `expo-location`, `crypto-js` |
+| Application mobile | React Native 0.81 via Expo SDK 54 (workflow managé), React Navigation, `expo-sqlite`, `expo-secure-store`, `expo-camera`, `expo-location`, `crypto-js`. Support web expérimental (`react-native-web`, `npx expo start --web`) pour le développement — SQLite et SecureStore n'y sont pas fiables, repli automatique sans plantage (voir §8) |
 | Back-office | Next.js 16 (App Router), React 19, aucune librairie de composants tierce (styles inline) |
 | Tests | Jest (unitaire, les 3 projets), Supertest (E2E backend), Playwright (E2E navigateur admin-web) |
 
@@ -268,7 +268,7 @@ Toutes les routes protégées exigent l'en-tête `Authorization: Bearer <accessT
 | GET | `/commandes/me` | client | Historique du client |
 | GET | `/commandes/:id` | client propriétaire / commerçant de la boutique / admin | Détail d'une commande |
 | GET | `/commandes/boutique/:boutiqueId` | propriétaire/admin | Commandes d'une boutique |
-| PATCH | `/commandes/:id/statut` | propriétaire/admin | Fait évoluer le statut |
+| PATCH | `/commandes/:id/statut` | propriétaire/admin, **ou client propriétaire pour une annulation** | Fait évoluer le statut. Le client ne peut qu'annuler (`annulee`) sa propre commande, et seulement tant qu'elle est encore `recue` (avant que le commerçant commence la préparation) |
 
 **Synchronisation hors-ligne** (`/sync`)
 
@@ -351,7 +351,7 @@ Le rôle est extrait du payload du JWT (décodé côté client, jamais vérifié
 | `CatalogueScreen` | `Catalogue` | Catalogue d'une boutique, horaires dépliables (statut ouvert/fermé calculé en temps réel), composition du panier |
 | `PanierScreen` | `Panier` | Récapitulatif du panier et de son total |
 | `CreneauScreen` | `Creneau` | Choix d'un créneau disponible + mode de paiement (sur place / en ligne simulé) + confirmation de la commande |
-| `CommandeStatutScreen` | `CommandeStatut` | Suivi de statut en temps réel (WebSocket), billet QR, détail du reçu (boutique + articles), mis en cache pour consultation hors-ligne |
+| `CommandeStatutScreen` | `CommandeStatut` | Suivi de statut en temps réel (WebSocket), billet QR, détail du reçu (boutique + articles), mis en cache pour consultation hors-ligne. Bouton d'annulation tant que la commande est `recue` |
 | `BilletRetraitScreen` | `MesBillets` | Historique des commandes du client, avec repli automatique sur le cache local si le réseau est indisponible |
 
 **Parcours nominal** : `BoutiqueList → Catalogue → Panier → Creneau → CommandeStatut`.
@@ -360,13 +360,13 @@ Le rôle est extrait du payload du JWT (décodé côté client, jamais vérifié
 
 | Écran | Route | Rôle |
 |---|---|---|
-| `DashboardScreen` | `Dashboard` | Tableau de bord : commandes filtrées par statut, badge hors-ligne, badge de synchronisation en attente, état vide avec appel à créer sa boutique |
+| `DashboardScreen` | `Dashboard` | Tableau de bord : commandes filtrées par statut, badge hors-ligne, badge de synchronisation en attente, état vide avec appel à créer sa boutique. Bouton « Scanner un billet de retrait » donnant un accès direct au scan sans passer par une commande précise (voir `ScanRetraitScreen` ci-dessous) |
 | `FicheBoutiqueScreen` | `FicheBoutique` | Création (si aucune boutique) ou modification de la fiche boutique (nom, catégorie, adresse, position via géolocalisation) |
 | `HorairesManagerScreen` | `HorairesManager` | Horaires d'ouverture, jour par jour, bascule ouvert/fermé |
 | `CatalogueManagerScreen` | `CatalogueManager` | Création/modification de produits, bascule Actif/Désactivé (désactivation, pas suppression — voir §4.3) |
 | `CreneauxManagerScreen` | `CreneauxManager` | Création/suppression de créneaux de retrait avec capacité |
-| `CommandesScreen` | `CommandeDetail` | Détail d'une commande, transitions de statut (Reçue → En préparation → Prête) |
-| `ScanRetraitScreen` | `ScanRetrait` | Validation du retrait : scan caméra du QR **ou** saisie manuelle du code court, entièrement hors-ligne |
+| `CommandesScreen` | `CommandeDetail` | Détail d'une commande : articles à préparer, transitions de statut (Reçue → En préparation → Prête). Bouton d'annulation tant que la commande est `recue` (libère stock et créneau) |
+| `ScanRetraitScreen` | `ScanRetrait` | Validation du retrait : scan caméra du QR **ou** saisie manuelle du code court, entièrement hors-ligne. Accessible soit depuis une commande précise (statut `prete`), soit directement depuis le tableau de bord — dans ce second cas, la commande cible est déterminée par le billet déchiffré lui-même, recoupé avec le cache local de la boutique |
 | `SyncEnAttenteScreen` | `SyncEnAttente` | Liste des événements de retrait en attente ou refusés par le serveur, avec nouvelle tentative manuelle |
 
 ### 5.5 Mode hors-ligne
@@ -472,6 +472,7 @@ Les tests E2E backend et Playwright sont **non destructifs** : chaque exécution
 - **Un commerçant = une boutique** dans l'interface mobile actuelle (le modèle de données autorise plusieurs boutiques par commerçant, mais le tableau de bord et la navigation ne gèrent que `boutiques[0]`).
 - **Expo Go + iOS 26** : bug connu et actuellement non résolu dans le moteur Hermes (incompatibilité avec le PAC — Pointer Authentication Codes — d'ARM64 sur iOS 26), provoquant des plantages natifs aléatoires sur téléphone physique. N'affecte pas Android ni les simulateurs iOS. Suivre [expo/expo#44356](https://github.com/expo/expo/issues/44356) ; en attendant, privilégier les tests sur Android ou un appareil iOS antérieur à iOS 26.
 - **`API_URL`** (mobile) et l'URL de l'API (admin-web) sont codées en dur plutôt que lues depuis une variable d'environnement — à adapter manuellement à chaque changement de réseau ou d'environnement de déploiement.
+- **Cache local et rotation de la clé de chiffrement** : si la clé stockée dans le Keychain/Keystore de l'appareil disparaît (ex. réinitialisation du trousseau, réinstallation), les entrées de `commandes_cache` chiffrées avec l'ancienne clé deviennent illisibles. Elles sont silencieusement ignorées plutôt que de faire échouer toute lecture (`offlineDb.getCommandesHorsLigne`), mais restent alors invisibles hors-ligne tant que l'appareil n'a pas retéléchargé ces commandes en ligne pour les recacher sous la clé actuelle.
 
 ---
 
